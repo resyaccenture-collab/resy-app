@@ -360,7 +360,7 @@ function CardBack({r,amexLinked,onFlipBack,onSwipeRight}){
         {loading&&<div style={{position:"absolute",inset:0,background:"rgba(255,255,255,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}><div className="spinner" style={{borderTopColor:"#FF4438"}}/></div>}
       </div>
       {/* Scrollable info */}
-      <div onClick={e=>e.stopPropagation()} style={{flex:1,overflowY:"auto",padding:"9px 13px 4px"}}>
+      <div style={{flex:1,overflowY:"auto",padding:"9px 13px 4px"}}>
         {data&&<div style={{display:"flex",alignItems:"center",gap:5,marginBottom:7}}>
           <div style={{width:7,height:7,borderRadius:"50%",background:data.isOpen?"#22C55E":"#EF4444",flexShrink:0}}/>
           <span style={{fontSize:11,fontWeight:700,color:data.isOpen?"#22C55E":"#EF4444"}}>{data.isOpen===null?"Hours unknown":data.isOpen?"Open now":"Closed"}</span>
@@ -388,9 +388,9 @@ function CardBack({r,amexLinked,onFlipBack,onSwipeRight}){
         </div>}
       </div>
       {/* Reserve / back */}
-      <div onClick={e=>e.stopPropagation()} style={{padding:"7px 12px 12px",flexShrink:0,borderTop:"1px solid #F3F3F3"}}>
+      <div style={{padding:"7px 12px 12px",flexShrink:0,borderTop:"1px solid #F3F3F3"}}>
         {effectiveTimes.length>0
-          ?<button onClick={()=>onSwipeRight()} style={{width:"100%",padding:"10px",borderRadius:10,background:"#FF4438",border:"none",color:"#FFF",fontSize:13,fontWeight:700,cursor:"pointer"}}>Reserve · {effectiveTimes[0]}</button>
+          ?<button onClick={e=>{e.stopPropagation();onSwipeRight();}} style={{width:"100%",padding:"10px",borderRadius:10,background:"#FF4438",border:"none",color:"#FFF",fontSize:13,fontWeight:700,cursor:"pointer"}}>Reserve · {effectiveTimes[0]}</button>
           :<button onClick={e=>{e.stopPropagation();onFlipBack();}} style={{width:"100%",padding:"9px",borderRadius:10,background:"none",border:"1.5px solid #EEE",color:"#AAA",fontSize:12,cursor:"pointer"}}>Back to swiping ↩</button>
         }
       </div>
@@ -412,6 +412,18 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
   const isGDA=r.amexExclusive&&amexLinked;
   const isFullyBooked=r.notifyOnly&&!amexLinked;
 
+  const[livePhoto,setLivePhoto]=useState(null);
+  useEffect(()=>{
+    if(stackIndex>1)return;
+    window._placeCache=window._placeCache||{};
+    const cached=window._placeCache[r.id];
+    if(cached?.photos?.length>0){setLivePhoto(`/api/place-photo?ref=${encodeURIComponent(cached.photos[0].ref)}`);return;}
+    fetch(`/api/place-details?name=${encodeURIComponent(r.name)}`)
+      .then(res=>res.ok?res.json():null)
+      .then(d=>{if(d){window._placeCache[r.id]=d;if(d.photos?.length>0)setLivePhoto(`/api/place-photo?ref=${encodeURIComponent(d.photos[0].ref)}`);} })
+      .catch(()=>{});
+  },[stackIndex,r.id,r.name]);
+
   const doSwipe=useCallback(dir=>{setFlyDir(dir);setTimeout(()=>onSwipe(dir,r),360);},[onSwipe,r]);
   useEffect(()=>{if(triggerSwipe&&isTop)doSwipe(triggerSwipe);},[triggerSwipe]);
   useEffect(()=>{setDx(0);setFlyDir(null);setFlipped(false);setFlipping(false);},[stackIndex]);
@@ -421,7 +433,7 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
 
   useEffect(()=>{
     if(!isTop)return;
-    const mv=e=>{if(!dragging.current)return;const cx=e.touches?.[0]?.clientX??e.clientX;ldx.current=cx-sx.current;setDx(ldx.current);};
+    const mv=e=>{if(!dragging.current)return;const cx=e.touches?.[0]?.clientX??e.clientX;const cy=e.touches?.[0]?.clientY??e.clientY;ldx.current=cx-sx.current;ldy.current=cy-sy.current;setDx(ldx.current);};
     const up=()=>{if(!dragging.current)return;dragging.current=false;if(Math.abs(ldx.current)>75)doSwipe(ldx.current>0?"right":"left");else setDx(0);};
     document.addEventListener("mousemove",mv);document.addEventListener("mouseup",up);
     document.addEventListener("touchmove",mv,{passive:true});document.addEventListener("touchend",up);
@@ -449,7 +461,7 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
 
   return(
     <div onMouseDown={onStart} onTouchStart={onStart}
-      onClick={()=>{if(isTop&&Math.abs(ldx.current)<10&&!flyDir)handleFlip();}}
+      onClick={()=>{if(isTop&&Math.abs(ldx.current)<10&&Math.abs(ldy.current)<10&&!flyDir)handleFlip();}}
       style={{position:"absolute",inset:0,transform:tf,transition:tr,zIndex:30-stackIndex,
         cursor:isTop?(dragging.current?"grabbing":"grab"):"default",
         userSelect:"none",transformOrigin:"bottom center"}}>
@@ -462,7 +474,7 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
         :<>
         {/* Photo */}
         <div style={{flex:"0 0 68%",position:"relative",overflow:"hidden"}}>
-          <RestaurantImg r={r}/>
+          {livePhoto?<img src={livePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={r.name}/>:<RestaurantImg r={r}/>}
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(0,0,0,0.72) 100%)"}}/>
 
           {/* Badges */}
@@ -917,11 +929,12 @@ function FilterSheet({filters,onApply,onClose,totalCount}){
 /* ── ONBOARDING MODAL ── */
 function OnboardingModal({onDone}){
   const[step,setStep]=useState(0);
+  const[name,setName]=useState('');
   const[budget,setBudget]=useState(75);
   const[dist,setDist]=useState("nearby");
   const[vibe,setVibe]=useState("casual");
   const[amexTier,setAmexTier]=useState("skip");
-  const next=()=>step<3?setStep(s=>s+1):onDone({budget,dist,vibe,amexTier:amexTier==="skip"?null:amexTier});
+  const next=()=>step<3?setStep(s=>s+1):(localStorage.setItem('resy_name',name.trim()),onDone({budget,dist,vibe,amexTier:amexTier==="skip"?null:amexTier}));
   return(
     <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.46)",display:"flex",flexDirection:"column",justifyContent:"flex-end",zIndex:110}}>
       <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",padding:"24px 22px 42px",maxHeight:"86vh",overflowY:"auto"}}>
@@ -930,9 +943,17 @@ function OnboardingModal({onDone}){
           <div style={{height:"100%",width:`${(step+1)/4*100}%`,background:"#FF4438",borderRadius:1,transition:"width 0.32s ease"}}/>
         </div>
         {step===0&&<>
-          <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#FF4438",margin:"0 0 5px"}}>Discover · St. Charles</p>
-          <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>Set your preferences</h2>
-          <p style={{fontSize:14,color:"#999",margin:"0 0 24px",lineHeight:1.5}}>We'll show the right restaurants for tonight near Q Center.</p>
+          <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#FF4438",margin:"0 0 5px"}}>Welcome · St. Charles</p>
+          <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>What should we call you?</h2>
+          <p style={{fontSize:14,color:"#999",margin:"0 0 18px",lineHeight:1.5}}>We'll personalize tonight's picks near Q Center.</p>
+          <div style={{marginBottom:22}}>
+            <input type="text" value={name} onChange={e=>setName(e.target.value)}
+              placeholder="Your name"
+              style={{width:"100%",padding:"13px 16px",borderRadius:11,border:"1.5px solid #E8E8E8",background:"#FAFAFA",fontSize:16,color:"#1A1A1A",outline:"none",boxSizing:"border-box"}}
+              onFocus={e=>e.target.style.borderColor="#FF4438"} onBlur={e=>e.target.style.borderColor="#E8E8E8"}
+            />
+          </div>
+          <p style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",color:"#999",margin:"0 0 10px"}}>Budget per person</p>
           <div style={{marginBottom:28}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
               <span style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",color:"#999"}}>Budget per person</span>
@@ -2080,6 +2101,9 @@ function ReservationsScreen({onDiscover,dynamicBookings}){
 
 /* ── PROFILE SCREEN ── */
 function ProfileScreen(){
+  const storedName=localStorage.getItem('resy_name')||'';
+  const displayName=storedName||'Guest';
+  const initials=storedName.trim().split(/\s+/).map(w=>w[0]?.toUpperCase()||'').join('').slice(0,2)||'?';
   const rows=[
     {icon:I.bookmark,label:"Saved Restaurants",note:"8"},
     {icon:I.star,label:"Dining Preferences"},
@@ -2094,10 +2118,10 @@ function ProfileScreen(){
         <div style={{padding:"4px 16px 20px",borderBottom:"1px solid #F5F5F5",marginBottom:6}}>
           <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
             <div style={{width:62,height:62,borderRadius:"50%",background:"#FF4438",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <span style={{color:"#FFF",fontSize:20,fontWeight:800}}>JD</span>
+              <span style={{color:"#FFF",fontSize:20,fontWeight:800}}>{initials}</span>
             </div>
             <div>
-              <p style={{fontSize:18,fontWeight:800,color:"#1A1A1A",margin:"0 0 2px"}}>Jane Doe</p>
+              <p style={{fontSize:18,fontWeight:800,color:"#1A1A1A",margin:"0 0 2px"}}>{displayName}</p>
               <p style={{fontSize:12,color:"#AAAAAA",margin:"0 0 7px"}}>Member since January 2021</p>
               <div style={{display:"flex",gap:6}}>
                 <span style={{background:"#FF4438",color:"#FFF",fontSize:9,fontWeight:800,padding:"3px 8px",borderRadius:4,letterSpacing:"0.6px"}}>RESY BLACK</span>
