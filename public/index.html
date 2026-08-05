@@ -339,14 +339,17 @@ function CardBack({r,amexLinked,onFlipBack,onSwipeRight}){
           ?<img src={`/api/place-photo?ref=${encodeURIComponent(photos[photoIdx].ref)}`} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={r.name}/>
           :<RestaurantImg r={r}/>}
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,0) 35%,rgba(0,0,0,0.60) 100%)"}}/>
-        {photos.length>1&&(
-          <div style={{position:"absolute",bottom:7,left:"50%",transform:"translateX(-50%)",display:"flex",gap:3}}>
-            {photos.slice(0,5).map((_,i)=>(
-              <div key={i} onClick={e=>{e.stopPropagation();setPhotoIdx(i);}}
-                style={{width:i===photoIdx?14:5,height:5,borderRadius:3,background:i===photoIdx?"#FFF":"rgba(255,255,255,0.45)",transition:"width 0.2s",cursor:"pointer"}}/>
+        {photos.length>1&&<>
+          <div onClick={e=>{e.stopPropagation();setPhotoIdx(i=>(i-1+photos.length)%photos.length);}}
+            style={{position:"absolute",left:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer"}}/>
+          <div onClick={e=>{e.stopPropagation();setPhotoIdx(i=>(i+1)%photos.length);}}
+            style={{position:"absolute",right:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer"}}/>
+          <div style={{position:"absolute",bottom:7,left:"50%",transform:"translateX(-50%)",display:"flex",gap:3,zIndex:6}}>
+            {photos.slice(0,8).map((_,i)=>(
+              <div key={i} style={{width:i===photoIdx?14:5,height:5,borderRadius:3,background:i===photoIdx?"#FFF":"rgba(255,255,255,0.45)",transition:"width 0.2s"}}/>
             ))}
           </div>
-        )}
+        </>}
         <button onClick={e=>{e.stopPropagation();onFlipBack();}}
           style={{position:"absolute",top:9,right:9,width:26,height:26,borderRadius:"50%",background:"rgba(0,0,0,0.45)",border:"none",color:"#FFF",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)",zIndex:2,lineHeight:1}}>×</button>
         <div style={{position:"absolute",bottom:12,left:12,right:38}}>
@@ -412,21 +415,22 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
   const isGDA=r.amexExclusive&&amexLinked;
   const isFullyBooked=r.notifyOnly&&!amexLinked;
 
-  const[livePhoto,setLivePhoto]=useState(null);
+  const[livePhotos,setLivePhotos]=useState([]);
+  const[frontPhotoIdx,setFrontPhotoIdx]=useState(0);
   useEffect(()=>{
     if(stackIndex>1)return;
     window._placeCache=window._placeCache||{};
     const cached=window._placeCache[r.id];
-    if(cached?.photos?.length>0){setLivePhoto(`/api/place-photo?ref=${encodeURIComponent(cached.photos[0].ref)}`);return;}
+    if(cached?.photos?.length>0){setLivePhotos(cached.photos.map(p=>`/api/place-photo?ref=${encodeURIComponent(p.ref)}`));return;}
     fetch(`/api/place-details?name=${encodeURIComponent(r.name)}`)
       .then(res=>res.ok?res.json():null)
-      .then(d=>{if(d){window._placeCache[r.id]=d;if(d.photos?.length>0)setLivePhoto(`/api/place-photo?ref=${encodeURIComponent(d.photos[0].ref)}`);} })
+      .then(d=>{if(d){window._placeCache[r.id]=d;if(d.photos?.length>0)setLivePhotos(d.photos.map(p=>`/api/place-photo?ref=${encodeURIComponent(p.ref)}`));} })
       .catch(()=>{});
   },[stackIndex,r.id,r.name]);
 
   const doSwipe=useCallback(dir=>{setFlyDir(dir);setTimeout(()=>onSwipe(dir,r),360);},[onSwipe,r]);
   useEffect(()=>{if(triggerSwipe&&isTop)doSwipe(triggerSwipe);},[triggerSwipe]);
-  useEffect(()=>{setDx(0);setFlyDir(null);setFlipped(false);setFlipping(false);},[stackIndex]);
+  useEffect(()=>{setDx(0);setFlyDir(null);setFlipped(false);setFlipping(false);setFrontPhotoIdx(0);},[stackIndex]);
 
   const handleFlip=()=>{setFlipping(true);setTimeout(()=>{setFlipped(f=>!f);setFlipping(false);},150);};
   const flipBack=()=>{setFlipping(true);setTimeout(()=>{setFlipped(false);setFlipping(false);},150);};
@@ -474,8 +478,20 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
         :<>
         {/* Photo */}
         <div style={{flex:"0 0 68%",position:"relative",overflow:"hidden"}}>
-          {livePhoto?<img src={livePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={r.name}/>:<RestaurantImg r={r}/>}
+          {livePhotos.length>0?<img src={livePhotos[frontPhotoIdx]} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={r.name}/>:<RestaurantImg r={r}/>}
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(0,0,0,0.72) 100%)"}}/>
+          {/* Left/right photo tap zones */}
+          {livePhotos.length>1&&<>
+            <div onClick={e=>{e.stopPropagation();setFrontPhotoIdx(i=>(i-1+livePhotos.length)%livePhotos.length);}}
+              style={{position:"absolute",left:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer"}}/>
+            <div onClick={e=>{e.stopPropagation();setFrontPhotoIdx(i=>(i+1)%livePhotos.length);}}
+              style={{position:"absolute",right:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer"}}/>
+            <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",display:"flex",gap:3,zIndex:6}}>
+              {livePhotos.slice(0,8).map((_,i)=>(
+                <div key={i} style={{width:i===frontPhotoIdx?18:5,height:4,borderRadius:2,background:i===frontPhotoIdx?"#FFF":"rgba(255,255,255,0.45)",transition:"width 0.2s"}}/>
+              ))}
+            </div>
+          </>}
 
           {/* Badges */}
           <div style={{position:"absolute",top:14,left:14,display:"flex",gap:6}}>
