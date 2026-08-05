@@ -2217,6 +2217,10 @@ function App(){
   const isWide=window.innerWidth>430;
   const addBooking=useCallback(b=>setBookings(p=>[b,...p]),[]);
   const goToReservations=useCallback(()=>setTab("reservations"),[]);
+  useEffect(()=>{
+    const url=activeGroupCode?`${window.location.origin}${window.location.pathname}?group=${activeGroupCode}`:null;
+    window.parent.postMessage({type:'resyGroupCode',code:activeGroupCode,url},'*');
+  },[activeGroupCode]);
   const groupUrl=activeGroupCode?`${window.location.origin}${window.location.pathname}?group=${activeGroupCode}`:null;
   const qrSrc=activeGroupCode
     ?`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(groupUrl)}&color=1A1A1A&bgcolor=FFFFFF`
