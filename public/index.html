@@ -934,26 +934,28 @@ function OnboardingModal({onDone}){
   const[dist,setDist]=useState("nearby");
   const[vibe,setVibe]=useState("casual");
   const[amexTier,setAmexTier]=useState("skip");
-  const next=()=>step<3?setStep(s=>s+1):(localStorage.setItem('resy_name',name.trim()),onDone({budget,dist,vibe,amexTier:amexTier==="skip"?null:amexTier}));
+  const next=()=>step<4?setStep(s=>s+1):(localStorage.setItem('resy_name',name.trim()),onDone({budget,dist,vibe,amexTier:amexTier==="skip"?null:amexTier}));
   return(
     <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.46)",display:"flex",flexDirection:"column",justifyContent:"flex-end",zIndex:110}}>
       <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",padding:"24px 22px 42px",maxHeight:"86vh",overflowY:"auto"}}>
         <div style={{width:36,height:4,background:"#E8E8E8",borderRadius:2,margin:"0 auto 22px"}}/>
         <div style={{height:2,background:"#F0F0F0",borderRadius:1,marginBottom:22,overflow:"hidden"}}>
-          <div style={{height:"100%",width:`${(step+1)/4*100}%`,background:"#FF4438",borderRadius:1,transition:"width 0.32s ease"}}/>
+          <div style={{height:"100%",width:`${(step+1)/5*100}%`,background:"#FF4438",borderRadius:1,transition:"width 0.32s ease"}}/>
         </div>
         {step===0&&<>
           <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#FF4438",margin:"0 0 5px"}}>Welcome · St. Charles</p>
           <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>What should we call you?</h2>
-          <p style={{fontSize:14,color:"#999",margin:"0 0 18px",lineHeight:1.5}}>We'll personalize tonight's picks near Q Center.</p>
-          <div style={{marginBottom:22}}>
-            <input type="text" value={name} onChange={e=>setName(e.target.value)}
-              placeholder="Your name"
-              style={{width:"100%",padding:"13px 16px",borderRadius:11,border:"1.5px solid #E8E8E8",background:"#FAFAFA",fontSize:16,color:"#1A1A1A",outline:"none",boxSizing:"border-box"}}
-              onFocus={e=>e.target.style.borderColor="#FF4438"} onBlur={e=>e.target.style.borderColor="#E8E8E8"}
-            />
-          </div>
-          <p style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",color:"#999",margin:"0 0 10px"}}>Budget per person</p>
+          <p style={{fontSize:14,color:"#999",margin:"0 0 24px",lineHeight:1.5}}>We'll personalize tonight's picks near Q Center.</p>
+          <input type="text" value={name} onChange={e=>setName(e.target.value)}
+            placeholder="Your name"
+            style={{width:"100%",padding:"14px 16px",borderRadius:11,border:"1.5px solid #E8E8E8",background:"#FAFAFA",fontSize:16,color:"#1A1A1A",outline:"none",boxSizing:"border-box",marginBottom:28}}
+            onFocus={e=>e.target.style.borderColor="#FF4438"} onBlur={e=>e.target.style.borderColor="#E8E8E8"}
+          />
+        </>}
+        {step===1&&<>
+          <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#FF4438",margin:"0 0 5px"}}>Discover · St. Charles</p>
+          <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>Set your budget</h2>
+          <p style={{fontSize:14,color:"#999",margin:"0 0 24px",lineHeight:1.5}}>We'll show the right restaurants for tonight.</p>
           <div style={{marginBottom:28}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
               <span style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",color:"#999"}}>Budget per person</span>
@@ -963,7 +965,7 @@ function OnboardingModal({onDone}){
             <div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontSize:11,color:"#C8C8C8"}}><span>$20</span><span>$150</span></div>
           </div>
         </>}
-        {step===1&&<>
+        {step===2&&<>
           <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>How far will you go?</h2>
           <p style={{fontSize:14,color:"#999",margin:"0 0 22px"}}>From Q Center, St. Charles IL.</p>
           <div style={{display:"flex",gap:8,marginBottom:28}}>
@@ -972,7 +974,7 @@ function OnboardingModal({onDone}){
             ))}
           </div>
         </>}
-        {step===2&&<>
+        {step===3&&<>
           <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>Tonight's vibe?</h2>
           <p style={{fontSize:14,color:"#999",margin:"0 0 22px"}}>We'll tailor the feed to match the mood.</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:28}}>
@@ -981,7 +983,7 @@ function OnboardingModal({onDone}){
             ))}
           </div>
         </>}
-        {step===3&&<>
+        {step===4&&<>
           <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>Connect your Amex card</h2>
           <p style={{fontSize:14,color:"#999",margin:"0 0 10px",lineHeight:1.55}}>Unlock Priority Notify, Global Dining Access exclusive availability, and your quarterly dining credit.</p>
           <div style={{background:"#FFF8F7",border:"1px solid #FFE0DC",borderRadius:10,padding:"10px 13px",marginBottom:18,display:"flex",gap:8,alignItems:"flex-start"}}>
@@ -1002,7 +1004,7 @@ function OnboardingModal({onDone}){
           </div>
         </>}
         <button onClick={next} style={{width:"100%",padding:15,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer",letterSpacing:"0.1px"}}>
-          {step<3?"Continue →":(amexTier&&amexTier!=="skip")?"Start Discovering · Amex Connected":"Start Discovering"}
+          {step<4?"Continue →":(amexTier&&amexTier!=="skip")?"Start Discovering · Amex Connected":"Start Discovering"}
         </button>
         {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{width:"100%",padding:"12px",marginTop:8,background:"none",border:"none",color:"#AAAAAA",fontSize:14,cursor:"pointer"}}>Back</button>}
       </div>
