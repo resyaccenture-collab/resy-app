@@ -341,9 +341,13 @@ function CardBack({r,amexLinked,onFlipBack,onSwipeRight}){
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,0) 35%,rgba(0,0,0,0.60) 100%)"}}/>
         {photos.length>1&&<>
           <div onClick={e=>{e.stopPropagation();setPhotoIdx(i=>(i-1+photos.length)%photos.length);}}
-            style={{position:"absolute",left:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer"}}/>
+            style={{position:"absolute",left:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"flex-start",paddingLeft:8}}>
+            <div style={{width:26,height:26,borderRadius:"50%",background:"rgba(0,0,0,0.32)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",color:"#FFF",fontSize:16,lineHeight:1,userSelect:"none"}}>‹</div>
+          </div>
           <div onClick={e=>{e.stopPropagation();setPhotoIdx(i=>(i+1)%photos.length);}}
-            style={{position:"absolute",right:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer"}}/>
+            style={{position:"absolute",right:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:8}}>
+            <div style={{width:26,height:26,borderRadius:"50%",background:"rgba(0,0,0,0.32)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",color:"#FFF",fontSize:16,lineHeight:1,userSelect:"none"}}>›</div>
+          </div>
           <div style={{position:"absolute",bottom:7,left:"50%",transform:"translateX(-50%)",display:"flex",gap:3,zIndex:6}}>
             {photos.slice(0,8).map((_,i)=>(
               <div key={i} style={{width:i===photoIdx?14:5,height:5,borderRadius:3,background:i===photoIdx?"#FFF":"rgba(255,255,255,0.45)",transition:"width 0.2s"}}/>
@@ -480,12 +484,16 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
         <div style={{flex:"0 0 68%",position:"relative",overflow:"hidden"}}>
           {livePhotos.length>0?<img src={livePhotos[frontPhotoIdx]} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={r.name}/>:<RestaurantImg r={r}/>}
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(0,0,0,0.72) 100%)"}}/>
-          {/* Left/right photo tap zones */}
+          {/* Left/right photo tap zones + arrows */}
           {livePhotos.length>1&&<>
             <div onClick={e=>{e.stopPropagation();setFrontPhotoIdx(i=>(i-1+livePhotos.length)%livePhotos.length);}}
-              style={{position:"absolute",left:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer"}}/>
+              style={{position:"absolute",left:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"flex-start",paddingLeft:8}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.32)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",color:"#FFF",fontSize:17,lineHeight:1,userSelect:"none"}}>‹</div>
+            </div>
             <div onClick={e=>{e.stopPropagation();setFrontPhotoIdx(i=>(i+1)%livePhotos.length);}}
-              style={{position:"absolute",right:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer"}}/>
+              style={{position:"absolute",right:0,top:0,bottom:0,width:"38%",zIndex:5,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:8}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(0,0,0,0.32)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",color:"#FFF",fontSize:17,lineHeight:1,userSelect:"none"}}>›</div>
+            </div>
             <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",display:"flex",gap:3,zIndex:6}}>
               {livePhotos.slice(0,8).map((_,i)=>(
                 <div key={i} style={{width:i===frontPhotoIdx?18:5,height:4,borderRadius:2,background:i===frontPhotoIdx?"#FFF":"rgba(255,255,255,0.45)",transition:"width 0.2s"}}/>
