@@ -237,12 +237,17 @@ const Pill=({label,active,onClick,sm,count})=>(
 const TimePill=({t,onSelect,sel})=>(
   <button onClick={()=>onSelect&&onSelect(t)} style={{padding:"6px 11px",borderRadius:7,border:`1.5px solid ${sel?"#FF4438":"#E8E8E8"}`,background:sel?"#FF4438":"#FFF",color:sel?"#FFF":"#FF4438",fontSize:"12px",fontWeight:600,cursor:onSelect?"pointer":"default",letterSpacing:"0.1px",transition:"all 0.15s",flexShrink:0}}>{t}</button>
 );
-const Stars=({n,sz=11})=>(
-  <span style={{display:"inline-flex",alignItems:"center",gap:2}}>
-    <Svg d={I.star} size={sz} stroke="#FF4438" fill="#FF4438" sw={0}/>
-    <span style={{fontSize:sz+1,fontWeight:600,color:"#1A1A1A"}}>{n}</span>
-  </span>
-);
+const Stars=({n,rating,sz,size=11})=>{
+  const val=n??rating??0;
+  const s=sz??size;
+  if(n!=null||sz!=null){
+    return(<span style={{display:"inline-flex",alignItems:"center",gap:2}}>
+      <Svg d={I.star} size={s} stroke="#FF4438" fill="#FF4438" sw={0}/>
+      <span style={{fontSize:s+1,fontWeight:600,color:"#1A1A1A"}}>{val}</span>
+    </span>);
+  }
+  return(<span style={{fontSize:s,letterSpacing:1}}>{[1,2,3,4,5].map(i=><span key={i} style={{color:i<=Math.round(val)?"#FFB800":"#E0E0E0"}}>★</span>)}</span>);
+};
 const Field=({label,value,onChange,type="text",placeholder,icon})=>(
   <div>
     <p style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",color:"#767676",margin:"0 0 7px"}}>{label}</p>
@@ -443,9 +448,6 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
 }
 
 /* ── RESTAURANT DETAIL SHEET ── */
-function Stars({rating,size=11}){
-  return <span style={{fontSize:size,letterSpacing:1}}>{[1,2,3,4,5].map(i=><span key={i} style={{color:i<=Math.round(rating||0)?"#FFB800":"#E0E0E0"}}>★</span>)}</span>;
-}
 
 function RestaurantDetailSheet({r,amexLinked,onReserve,onClose}){
   const[data,setData]=useState(null);
