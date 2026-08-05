@@ -1513,7 +1513,7 @@ function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
   const[showGroupResults,setShowGroupResults]=useState(false);
   const[groupTimes,setGroupTimes]=useState({});  // {uid:{rId:"7:00 PM"}}
   const[pendingTimeR,setPendingTimeR]=useState(null); // restaurant awaiting time pick
-  const[joinName,setJoinName]=useState("");
+  const[joinName,setJoinName]=useState(localStorage.getItem('resy_name')||"");
   const groupDBRef=useRef(null);
   const storageLstnRef=useRef(null); // localStorage storage-event listener
   const myUID=useRef(getUID()).current;
@@ -1850,13 +1850,10 @@ function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
             <p style={{color:"#AAAAAA",fontSize:13,lineHeight:1.55,margin:"0 0 14px"}}>
               Swipe right to vote. Tap Results in the group bar to see the leaderboard.
             </p>
-            <input
-              value={joinName}
-              onChange={e=>setJoinName(e.target.value)}
-              placeholder="Your name"
-              maxLength={24}
-              style={{width:"100%",padding:"12px 14px",borderRadius:10,border:"1.5px solid #EEEEEE",fontSize:14,color:"#1A1A1A",outline:"none",background:"#FAFAFA",boxSizing:"border-box",marginBottom:12}}
-            />
+            {localStorage.getItem('resy_name')
+              ?<p style={{fontSize:13,color:"#888",margin:"0 0 12px"}}>Joining as <strong style={{color:"#1A1A1A"}}>{joinName}</strong></p>
+              :<input value={joinName} onChange={e=>setJoinName(e.target.value)} placeholder="Your name" maxLength={24} style={{width:"100%",padding:"12px 14px",borderRadius:10,border:"1.5px solid #EEEEEE",fontSize:14,color:"#1A1A1A",outline:"none",background:"#FAFAFA",boxSizing:"border-box",marginBottom:12}}/>
+            }
             <button onClick={()=>joinGroup(joinPrompt,joinName||"Guest")} style={{width:"100%",padding:14,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:10}}>
               Join Group
             </button>
