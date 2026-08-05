@@ -1637,7 +1637,11 @@ function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
   },[myUID,attachStorageListener,onGroupSession]);
 
   const leaveGroup=useCallback(()=>{
-    if(groupDBRef.current){groupDBRef.current.child("members").off();groupDBRef.current.child("swipes").off();}
+    if(groupDBRef.current){
+      groupDBRef.current.remove();
+      groupDBRef.current.child("members").off();
+      groupDBRef.current.child("swipes").off();
+    }
     groupDBRef.current=null;
     if(storageLstnRef.current){window.removeEventListener("storage",storageLstnRef.current);storageLstnRef.current=null;}
     setGroupSession(null);setGroupMembers({});setGroupSwipes({});setGroupTimes({});
