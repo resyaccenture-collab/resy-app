@@ -1687,7 +1687,7 @@ function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
       return;
     }
     if(dir==="right"){
-      if(r.notifyOnly&&!amexLinked){setNotifyR(r);setTimeout(()=>setNotifyR(null),2800);setShowAmexPromo(true);}
+      if(r.notifyOnly&&!amexLinked){setNotifyR(r);setTimeout(()=>setNotifyR(null),2800);}
       else{const t=(r.notifyOnly?r.gdaTimes:r.times)[0];setMatch(r);setMatchTime(t);}
     }
   },[amexLinked,groupSession,recordGroupSwipe]);
