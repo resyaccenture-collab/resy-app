@@ -1,0 +1,2150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Resy - Reinvented</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+  window.EMAILJS_PUBLIC_KEY  = "RM0xQAtZFCoIn6BVi";
+  window.EMAILJS_SERVICE_ID  = "service_kcgc7t5";
+  window.EMAILJS_TEMPLATE_ID = "template_sn132dp";
+  if (window.EMAILJS_PUBLIC_KEY !== "YOUR_PUBLIC_KEY") emailjs.init(window.EMAILJS_PUBLIC_KEY);
+
+  // ── Firebase config ─────────────────────────────────────────────────────────
+  // Setup: console.firebase.google.com → New project → Realtime Database → Start
+  // Rules (for demo): { "rules": { "sessions": { ".read": true, ".write": true } } }
+  // Then paste your config object here:
+  window.FIREBASE_CFG = {
+    apiKey:            "AIzaSyAdjm5xjfJLVLZQIvj0QlP6hOTMFpWfoIk",
+    authDomain:        "resy-demo-b1955.firebaseapp.com",
+    databaseURL:       "https://resy-demo-b1955-default-rtdb.firebaseio.com",
+    projectId:         "resy-demo-b1955",
+    storageBucket:     "resy-demo-b1955.firebasestorage.app",
+    messagingSenderId: "506441695244",
+    appId:             "1:506441695244:web:0279d894f0bbf282782e29",
+  };
+  window.resyDB = null;
+  try {
+    if (window.FIREBASE_CFG.apiKey !== "YOUR_API_KEY") {
+      firebase.initializeApp(window.FIREBASE_CFG);
+      window.resyDB = firebase.database();
+      console.log("[resy] Firebase connected");
+    } else {
+      console.log("[resy] Firebase not configured — group mode runs locally only");
+    }
+  } catch(e) { console.warn("[resy] Firebase init error:", e.message); }
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+body{background:#EDEBE7;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;overflow:hidden;}
+::-webkit-scrollbar{display:none;}
+input,textarea,button{font-family:inherit;}
+input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:3px;border-radius:2px;background:#E8E8E8;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#FF4438;cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);}
+textarea{resize:none;outline:none;}
+@keyframes slideUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes popIn{from{opacity:0;transform:scale(0.55);}to{opacity:1;transform:scale(1);}}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+@keyframes spin{to{transform:rotate(360deg);}}
+.slide-up{animation:slideUp 0.36s cubic-bezier(0.175,0.885,0.32,1.275) both;}
+.fade-in{animation:fadeIn 0.28s ease both;}
+.pop-in{animation:popIn 0.46s cubic-bezier(0.175,0.885,0.32,1.275) both;}
+.toast-in{animation:toastIn 0.28s cubic-bezier(0.175,0.885,0.32,1.275) both;}
+.spinner{width:17px;height:17px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.65s linear infinite;flex-shrink:0;}
+.resy-popup .leaflet-popup-content-wrapper{border-radius:14px;padding:0;box-shadow:0 8px 32px rgba(0,0,0,0.14);border:none;}
+.resy-popup .leaflet-popup-content{margin:14px 14px 14px;line-height:1.5;}
+.resy-popup .leaflet-popup-tip-container{display:none;}
+.leaflet-container{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useRef,useEffect,useCallback,useMemo}=React;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   RESTAURANT DATA  — real venues near Q Center, 1405 N 5th Ave, St. Charles IL
+───────────────────────────────────────────────────────────────────────────── */
+const RESTAURANTS=[
+  {
+    id:1,name:"The Graceful Ordinary",cuisine:"New American",hood:"Downtown St. Charles",
+    price:"$$$",pts:3,rating:4.6,dist:"1.5 mi",
+    desc:"AAA Three-Diamond farm-to-table where nearly everything is fired in a wood-burning hearth. Exceptional bone marrow and wild mushroom ravioli in an elegant but relaxed setting.",
+    times:[],notifyOnly:true,gdaTimes:["6:30 PM","8:00 PM"],amexExclusive:true,
+    ambiance:["romantic","upscale","business","intimate"],dietary:[],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1481833761820-0509d3217039?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"graceful-ordinary-stcharles",past:false,upcoming:false
+  },
+  {
+    id:2,name:"Mio Modo",cuisine:"Modern Italian",hood:"Downtown St. Charles",
+    price:"$$$",pts:3,rating:4.3,dist:"1.6 mi",
+    desc:"Scott Harris Hospitality's modern Italian delivers lighter takes on Italian classics with farm-to-table ingredients and a stunning bar alongside the Fox River.",
+    times:[],notifyOnly:true,gdaTimes:["7:00 PM"],amexExclusive:true,
+    ambiance:["romantic","lively","upscale","scenic"],dietary:[],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"mio-modo-stcharles",past:false,upcoming:false
+  },
+  {
+    id:3,name:"Fire + Wine",cuisine:"Italian · Wood-Fired",hood:"N. St. Charles",
+    price:"$$$",pts:3,rating:4.4,dist:"0.7 mi",
+    desc:"Centered around wood-fired cooking, seasonal ingredients, handcrafted pizzas, and house-made pastas with a thoughtfully curated wine and cocktail program.",
+    times:["5:00 PM","6:30 PM","8:15 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["romantic","cozy","intimate","wine-focused"],dietary:["vegetarian-friendly"],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1574484284002-952d92456975?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"fire-wine-stcharles",past:true,upcoming:false
+  },
+  {
+    id:4,name:"Gia Mia",cuisine:"Neapolitan Pizza",hood:"Downtown St. Charles",
+    price:"$$",pts:2,rating:4.5,dist:"1.5 mi",
+    desc:"Chef-driven farm-to-fork Italian featuring Neapolitan wood-fired pizzas, creative antipasto, fresh pasta, and handmade mozzarella in a casual, energetic space.",
+    times:["5:00 PM","5:45 PM","7:00 PM","8:30 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["casual","lively","family-friendly","buzzy"],dietary:["vegetarian-friendly"],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1565557996071-1bd1f59bb8b8?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"gia-mia-stcharles",past:true,upcoming:true
+  },
+  {
+    id:5,name:"La Mesa Modern Mexican",cuisine:"Modern Mexican",hood:"Downtown St. Charles",
+    price:"$$",pts:2,rating:4.1,dist:"1.6 mi",
+    desc:"Energetic modern Mexican on the Fox River with the largest tequila selection in the Chicago suburbs, signature craft margaritas, and a scenic 200-seat outdoor patio.",
+    times:["5:00 PM","6:00 PM","7:30 PM","9:00 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["lively","outdoor","festive","vibrant"],dietary:["vegetarian-friendly","gluten-free-friendly"],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1546833999-b9f581b1bd8b?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"la-mesa-stcharles",past:false,upcoming:false
+  },
+  {
+    id:6,name:"Duke's Northwoods",cuisine:"American · Supper Club",hood:"Downtown St. Charles",
+    price:"$$",pts:2,rating:4.2,dist:"1.4 mi",
+    desc:"Wisconsin supper club vibes on Main Street — cheese curds, Friday fish fry, smash burgers, and 24 draft beers in a fun, unpretentious setting.",
+    times:["5:00 PM","6:00 PM","7:00 PM","8:00 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["casual","lively","sports bar","pet-friendly"],dietary:[],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"dukes-northwoods-stcharles",past:false,upcoming:false
+  },
+  {
+    id:7,name:"Simple EJ's Kitchen & Tap",cuisine:"American · Craft Bar",hood:"N. St. Charles",
+    price:"$$",pts:2,rating:4.3,dist:"0.8 mi",
+    desc:"Upscale sports bar from 45 years of hospitality expertise — scratch-made smashburgers, chimichurri wings, and a full craft program anchored by a 20-foot LED screen.",
+    times:["5:00 PM","6:30 PM","7:30 PM","8:45 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["casual","sports bar","lively","family-friendly"],dietary:[],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1544025162-d76694d6b2f1?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"simple-ejs-stcharles",past:true,upcoming:false
+  },
+  {
+    id:8,name:"Portofino Trattoria",cuisine:"Classic Italian",hood:"Campton Hills",
+    price:"$$$",pts:3,rating:4.4,dist:"2.8 mi",
+    desc:"Family-owned trattoria praised for welcoming service, excellent minestrone, wood-fired pizzas, and signature Pollo Portofino — a quiet, refined retreat.",
+    times:["5:30 PM","7:00 PM","8:30 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["quiet","romantic","intimate","family-owned"],dietary:["vegetarian-friendly"],good_for_groups:false,
+    photo:"https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"portofino-stcharles",past:true,upcoming:true
+  },
+  {
+    id:9,name:"Mosaic Kitchen & Cocktails",cuisine:"Mediterranean Fusion",hood:"Downtown Geneva",
+    price:"$$",pts:2,rating:4.5,dist:"3.2 mi",
+    desc:"Geneva's most stylish gathering spot — modern Mediterranean flavors, craft cocktails, and a cozy coffee bar under one chic roof on Third Street.",
+    times:["5:00 PM","6:30 PM","8:00 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["stylish","business","artsy","all-day","quiet"],dietary:["vegetarian-friendly","gluten-free-friendly"],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1567521464030-0bc5b5e5b7e1?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"mosaic-geneva",past:false,upcoming:false
+  },
+  {
+    id:10,name:"The Alchemist",cuisine:"New American · Cocktail Bar",hood:"Downtown Geneva",
+    price:"$$$",pts:3,rating:4.4,dist:"3.4 mi",
+    desc:"Geneva's upscale cocktail-forward kitchen celebrated for inventive small plates — burrata, mussels, crab cakes — and a creative craft cocktail program in an intimate, design-forward space.",
+    times:["5:30 PM","7:00 PM","8:30 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["upscale","intimate","romantic","date-night","trendy"],dietary:["gluten-free-friendly"],good_for_groups:false,
+    photo:"https://images.unsplash.com/photo-1551024709-8f23befc548e?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"alchemist-geneva",past:false,upcoming:false
+  },
+];
+
+/* ── RESTAURANT COORDINATES (lat, lng) near Q Center, St. Charles IL ── */
+const COORDS={
+  1:[41.9141,-88.3056], // The Graceful Ordinary
+  2:[41.9135,-88.3094], // Mio Modo
+  3:[41.9145,-88.3057], // Fire + Wine
+  4:[41.9138,-88.3068], // Gia Mia
+  5:[41.9136,-88.3078], // La Mesa Modern Mexican
+  6:[41.9134,-88.3062], // Duke's Northwoods
+  7:[41.9224,-88.3081], // Simple EJ's
+  8:[41.8471,-88.3124], // Portofino Trattoria
+  9:[41.8872,-88.3031], // Mosaic Kitchen
+  10:[41.8878,-88.3029],// The Alchemist
+};
+const Q_CENTER=[41.9231,-88.3081];
+
+/* ── GROUP SESSION HELPERS ── */
+function getUID(){
+  let id=localStorage.getItem('resy_uid');
+  if(!id){id='u_'+Math.random().toString(36).substr(2,9);localStorage.setItem('resy_uid',id);}
+  return id;
+}
+function genGroupCode(){return 'RESY-'+(1000+Math.floor(Math.random()*8999));}
+
+/* ── FILTER DEFAULTS ── */
+const DEFAULT_FILTERS={groupSize:null,ambiance:[],cuisine:"all",price:[],dietary:[],openNow:false};
+
+/* ── ICONS ── */
+const Svg=({d,size=20,stroke="#1A1A1A",sw=1.75,fill="none",style={}})=>(
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={style}>
+    {[].concat(d).map((p,i)=><path key={i} d={p}/>)}
+  </svg>
+);
+const I={
+  compass:["M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z","M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"],
+  search:"M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0",
+  calendar:["M8 2v4","M16 2v4","M3 10h18","M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z"],
+  user:["M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2","M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
+  users:["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2","M23 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75","M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
+  heart:"M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z",
+  utensils:["M3 2v7c0 1.1.9 2 2 2h4v13","M17 2v20","M12 2v7c0 1.1-.9 2-2 2"],
+  x:["M18 6L6 18","M6 6l12 12"],
+  check:"M20 6L9 17l-5-5",
+  chevR:"M9 18l6-6-6-6",
+  pin:["M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z","M12 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"],
+  star:"M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
+  bell:["M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9","M13.73 21a2 2 0 0 1-3.46 0"],
+  bookmark:["M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"],
+  card:["M1 4h22v16H1z","M1 10h22"],
+  help:["M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z","M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3","M12 17h.01"],
+  settings:["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"],
+  filter:"M22 3H2l8 9.46V19l4 2v-8.54L22 3",
+  plus:["M12 5v14","M5 12h14"],
+  minus:"M5 12h14",
+  copy:["M8 17.929H6c-1.105 0-2-.912-2-2.036V5.036C4 3.91 4.895 3 6 3h8c1.105 0 2 .911 2 2.036v1.866m-6 .17h8c1.105 0 2 .91 2 2.035v10.857C20 21.09 19.105 22 18 22h-8c-1.105 0-2-.911-2-2.036V9.107c0-1.124.895-2.036 2-2.036z"],
+  mail:["M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z","M22 6l-10 7L2 6"],
+  sliders:["M4 21v-7","M4 10V3","M12 21v-9","M12 8V3","M20 21v-5","M20 12V3","M1 14h6","M9 8h6","M17 16h6"],
+  mapPin:["M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z","M12 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"],
+  trending:["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"],
+};
+
+/* ── HELPERS ── */
+const Pill=({label,active,onClick,sm,count})=>(
+  <button onClick={onClick} style={{padding:sm?"6px 12px":"9px 16px",borderRadius:99,border:`1.5px solid ${active?"#FF4438":"#E8E8E8"}`,background:active?"#FF4438":"#FFF",color:active?"#FFF":"#1A1A1A",fontSize:sm?"11px":"13px",fontWeight:active?600:400,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s",display:"flex",alignItems:"center",gap:5}}>
+    {label}
+    {count!=null&&<span style={{background:active?"rgba(255,255,255,0.3)":"#FF4438",color:"#FFF",borderRadius:99,fontSize:9,fontWeight:700,padding:"1px 5px",minWidth:16,textAlign:"center"}}>{count}</span>}
+  </button>
+);
+const TimePill=({t,onSelect,sel})=>(
+  <button onClick={()=>onSelect&&onSelect(t)} style={{padding:"6px 11px",borderRadius:7,border:`1.5px solid ${sel?"#FF4438":"#E8E8E8"}`,background:sel?"#FF4438":"#FFF",color:sel?"#FFF":"#FF4438",fontSize:"12px",fontWeight:600,cursor:onSelect?"pointer":"default",letterSpacing:"0.1px",transition:"all 0.15s",flexShrink:0}}>{t}</button>
+);
+const Stars=({n,sz=11})=>(
+  <span style={{display:"inline-flex",alignItems:"center",gap:2}}>
+    <Svg d={I.star} size={sz} stroke="#FF4438" fill="#FF4438" sw={0}/>
+    <span style={{fontSize:sz+1,fontWeight:600,color:"#1A1A1A"}}>{n}</span>
+  </span>
+);
+const Field=({label,value,onChange,type="text",placeholder,icon})=>(
+  <div>
+    <p style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",color:"#767676",margin:"0 0 7px"}}>{label}</p>
+    <div style={{position:"relative"}}>
+      {icon&&<div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}><Svg d={I[icon]} size={15} stroke="#AAAAAA"/></div>}
+      <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+        style={{width:"100%",padding:icon?"11px 12px 11px 36px":"11px 14px",borderRadius:10,border:"1.5px solid #E8E8E8",background:"#FAFAFA",fontSize:14,color:"#1A1A1A",outline:"none",boxSizing:"border-box",transition:"border-color 0.15s"}}
+        onFocus={e=>e.target.style.borderColor="#FF4438"} onBlur={e=>e.target.style.borderColor="#E8E8E8"}
+      />
+    </div>
+  </div>
+);
+
+/* ── RESTAURANT IMAGE with fallback ── */
+const RestaurantImg=({r,style={}})=>(
+  <img src={r.photo} alt={r.name}
+    onError={e=>{e.currentTarget.src=`https://picsum.photos/seed/${r.seed}/600/800`;e.currentTarget.onerror=null;}}
+    style={{width:"100%",height:"100%",objectFit:"cover",display:"block",...style}}
+    draggable="false"
+  />
+);
+
+/* ── APPLY FILTERS ── */
+const GROUP_VIBES=new Set(["casual","lively","sports bar","family-friendly","outdoor","festive","vibrant","buzzy","all-day","scenic","artsy","stylish"]);
+
+function applyFilters(list,f){
+  return list.filter(r=>{
+    // Group size
+    if(f.groupSize==="large"||f.groupSize==="party"){
+      if(!r.good_for_groups)return false;
+      // When no ambiance filter is explicitly set, exclude venues with no group-friendly vibe tags
+      if(f.ambiance.length===0&&!r.ambiance.some(a=>GROUP_VIBES.has(a)))return false;
+    }
+    // Ambiance — OR logic (any selected tag matches)
+    if(f.ambiance.length>0){if(!f.ambiance.some(a=>r.ambiance.includes(a)))return false;}
+    // Cuisine — smarter matching
+    if(f.cuisine&&f.cuisine!=="all"){
+      const c=r.cuisine.toLowerCase();
+      if(f.cuisine==="pizza"){if(!c.includes("pizza"))return false;}
+      else if(f.cuisine==="italian"){if(!c.includes("italian")&&!c.includes("pizza"))return false;}
+      else{if(!c.includes(f.cuisine.toLowerCase()))return false;}
+    }
+    if(f.price.length>0){if(!f.price.includes(r.price))return false;}
+    // Dietary — AND logic (all selected must match)
+    if(f.dietary.length>0){if(!f.dietary.every(d=>r.dietary.includes(d)))return false;}
+    return true;
+  });
+}
+
+/* ── NOTIFY TOAST ── */
+function NotifyToast({r,priority}){
+  return(
+    <div className="toast-in" style={{position:"absolute",bottom:90,left:12,right:12,background:"#1C1C1E",borderRadius:14,padding:"13px 15px",display:"flex",alignItems:"center",gap:11,zIndex:60,boxShadow:"0 8px 32px rgba(0,0,0,0.24)"}}>
+      <div style={{width:36,height:36,borderRadius:"50%",background:"#FF4438",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <Svg d={I.bell} size={17} stroke="#FFF" sw={2}/>
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{color:"#FFF",fontSize:13,fontWeight:700,margin:"0 0 2px"}}>Added to Notify list</p>
+        <p style={{color:"rgba(255,255,255,0.5)",fontSize:11,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+          {priority?`Priority access · First in queue for ${r.name}`:`We'll alert you when ${r.name} has a cancellation`}
+        </p>
+      </div>
+      {priority&&<div style={{background:"#FF4438",borderRadius:5,padding:"2px 7px",flexShrink:0}}><span style={{color:"#FFF",fontSize:9,fontWeight:800,letterSpacing:"0.5px"}}>AMEX ★</span></div>}
+    </div>
+  );
+}
+
+/* ── SWIPE CARD ── */
+function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVotes=0,memberCount=0,onTap}){
+  const[dx,setDx]=useState(0);
+  const[flyDir,setFlyDir]=useState(null);
+  const dragging=useRef(false);
+  const sx=useRef(0),sy=useRef(0),ldx=useRef(0),ldy=useRef(0);
+  const isTop=stackIndex===0;
+
+  const effectiveTimes=r.notifyOnly?(amexLinked?r.gdaTimes:[]):r.times;
+  const isGDA=r.amexExclusive&&amexLinked;
+  const isFullyBooked=r.notifyOnly&&!amexLinked;
+
+  const doSwipe=useCallback(dir=>{setFlyDir(dir);setTimeout(()=>onSwipe(dir,r),360);},[onSwipe,r]);
+  useEffect(()=>{if(triggerSwipe&&isTop)doSwipe(triggerSwipe);},[triggerSwipe]);
+  useEffect(()=>{setDx(0);setFlyDir(null);},[stackIndex]);
+
+  useEffect(()=>{
+    if(!isTop)return;
+    const mv=e=>{if(!dragging.current)return;const cx=e.touches?.[0]?.clientX??e.clientX;ldx.current=cx-sx.current;setDx(ldx.current);};
+    const up=()=>{if(!dragging.current)return;dragging.current=false;if(Math.abs(ldx.current)>75)doSwipe(ldx.current>0?"right":"left");else setDx(0);};
+    document.addEventListener("mousemove",mv);document.addEventListener("mouseup",up);
+    document.addEventListener("touchmove",mv,{passive:true});document.addEventListener("touchend",up);
+    return()=>{document.removeEventListener("mousemove",mv);document.removeEventListener("mouseup",up);document.removeEventListener("touchmove",mv);document.removeEventListener("touchend",up);};
+  },[isTop,doSwipe]);
+
+  const onStart=e=>{
+    if(!isTop||flyDir)return;dragging.current=true;ldx.current=0;
+    sx.current=e.touches?.[0]?.clientX??e.clientX;sy.current=e.touches?.[0]?.clientY??e.clientY;
+    e.preventDefault();
+  };
+
+  const SC=[1,0.956,0.915],YO=[0,14,26];
+  const sc=SC[stackIndex]??0.88,yo=YO[stackIndex]??36;
+  let tf,tr;
+  if(flyDir==="right"){tf="translateX(115vw) rotate(22deg)";tr="transform 0.38s cubic-bezier(0.55,0,0.8,0.95)";}
+  else if(flyDir==="left"){tf="translateX(-115vw) rotate(-22deg)";tr="transform 0.38s cubic-bezier(0.55,0,0.8,0.95)";}
+  else if(isTop){tf=`translateX(${dx}px) translateY(${Math.abs(dx)*0.05}px) rotate(${dx*0.045}deg)`;tr=dragging.current?"none":"transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275)";}
+  else{tf=`translateY(${yo}px) scale(${sc})`;tr="transform 0.3s ease";}
+
+  const likeOp=isTop?Math.min(Math.max(dx,0)/80,1):0;
+  const nopeOp=isTop?Math.min(Math.max(-dx,0)/80,1):0;
+
+  const ambianceBadge=r.ambiance[0];
+
+  return(
+    <div onMouseDown={onStart} onTouchStart={onStart}
+      onClick={()=>{if(isTop&&onTap&&Math.abs(ldx.current)<10&&!flyDir)onTap();}}
+      style={{position:"absolute",inset:0,transform:tf,transition:tr,zIndex:30-stackIndex,
+        cursor:isTop?(dragging.current?"grabbing":"grab"):"default",
+        userSelect:"none",transformOrigin:"bottom center"}}>
+      <div style={{borderRadius:18,overflow:"hidden",background:"#FFF",
+        boxShadow:"0 6px 28px rgba(0,0,0,0.12),0 1px 6px rgba(0,0,0,0.05)",
+        height:"100%",display:"flex",flexDirection:"column"}}>
+
+        {/* Photo */}
+        <div style={{flex:"0 0 68%",position:"relative",overflow:"hidden"}}>
+          <RestaurantImg r={r}/>
+          <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(0,0,0,0.72) 100%)"}}/>
+
+          {/* Badges */}
+          <div style={{position:"absolute",top:14,left:14,display:"flex",gap:6}}>
+            {isGDA&&<div style={{background:"#FF4438",borderRadius:6,padding:"3px 9px"}}><span style={{color:"#FFF",fontSize:9,fontWeight:800,letterSpacing:"0.8px"}}>AMEX GDA ★</span></div>}
+            {r.rating>=4.5&&<div style={{background:"rgba(255,255,255,0.18)",backdropFilter:"blur(8px)",borderRadius:6,padding:"3px 9px",border:"1px solid rgba(255,255,255,0.2)"}}><span style={{color:"#FFF",fontSize:9,fontWeight:700,letterSpacing:"0.4px"}}>⭑ TOP RATED</span></div>}
+            {groupVotes>0&&<div style={{background:"rgba(34,197,94,0.88)",backdropFilter:"blur(6px)",borderRadius:6,padding:"3px 9px",border:"1px solid rgba(255,255,255,0.2)"}}><span style={{color:"#FFF",fontSize:9,fontWeight:800,letterSpacing:"0.4px"}}>👥 {groupVotes}/{memberCount} want this</span></div>}
+          </div>
+          {ambianceBadge&&<div style={{position:"absolute",top:14,right:14,background:"rgba(0,0,0,0.36)",backdropFilter:"blur(8px)",borderRadius:6,padding:"3px 9px",border:"1px solid rgba(255,255,255,0.12)"}}>
+            <span style={{color:"#FFF",fontSize:9,fontWeight:600,textTransform:"capitalize",letterSpacing:"0.3px"}}>{ambianceBadge}</span>
+          </div>}
+
+          {/* SAVE / PASS stamps */}
+          <div style={{position:"absolute",top:20,left:16,opacity:likeOp,border:"3px solid #22C55E",borderRadius:9,padding:"4px 12px",color:"#22C55E",fontWeight:900,fontSize:20,letterSpacing:2,transform:"rotate(-14deg)"}}>
+            {isFullyBooked?"NOTIFY":"DINE!"}
+          </div>
+          <div style={{position:"absolute",top:20,right:16,opacity:nopeOp,border:"3px solid #FF4438",borderRadius:9,padding:"4px 12px",color:"#FF4438",fontWeight:900,fontSize:20,letterSpacing:2,transform:"rotate(14deg)"}}>PASS</div>
+          <div style={{position:"absolute",inset:0,background:"rgba(34,197,94,0.14)",opacity:likeOp,pointerEvents:"none"}}/>
+          <div style={{position:"absolute",inset:0,background:"rgba(255,68,56,0.14)",opacity:nopeOp,pointerEvents:"none"}}/>
+
+          {/* Name overlay */}
+          <div style={{position:"absolute",bottom:14,left:16,right:16}}>
+            <h2 style={{color:"#FFF",fontSize:22,fontWeight:800,margin:0,letterSpacing:"-0.4px",textShadow:"0 1px 8px rgba(0,0,0,0.3)"}}>{r.name}</h2>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+              <span style={{color:"rgba(255,255,255,0.78)",fontSize:12,fontWeight:500}}>{r.hood}</span>
+              <span style={{color:"rgba(255,255,255,0.4)",fontSize:10}}>·</span>
+              <span style={{color:"rgba(255,255,255,0.78)",fontSize:12,fontWeight:500}}>{r.cuisine}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Info panel — compact */}
+        <div style={{flex:1,padding:"10px 14px 10px",display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+          {/* Meta row */}
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            <Stars n={r.rating}/>
+            <span style={{color:"#DDDDDD"}}>·</span>
+            <span style={{color:"#555",fontSize:12,fontWeight:600}}>{r.price}</span>
+            <span style={{color:"#DDDDDD"}}>·</span>
+            <span style={{fontSize:12,color:"#999"}}>{r.dist}</span>
+            {r.good_for_groups&&<>
+              <span style={{color:"#DDDDDD"}}>·</span>
+              <span style={{display:"flex",alignItems:"center",gap:2,fontSize:11,color:"#AAAAAA"}}>
+                <Svg d={I.users} size={10} stroke="#BBBBBB"/>Groups OK
+              </span>
+            </>}
+          </div>
+
+          {/* Times / Notify */}
+          {isFullyBooked?(
+            <div>
+              <p style={{fontSize:11,color:"#C0C0C0",margin:"0 0 7px"}}>Fully booked tonight</p>
+              {isTop&&(
+                <button onClick={e=>{e.stopPropagation();onSwipe&&onSwipe("notify",r);}}
+                  style={{width:"100%",padding:"8px",borderRadius:9,background:"#FF4438",border:"none",color:"#FFF",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                  Notify Me
+                </button>
+              )}
+            </div>
+          ):(
+            <div>
+              <p style={{fontSize:"9px",fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#BBBBBB",margin:"0 0 6px"}}>
+                {isGDA?"GDA Exclusive · Amex Platinum Only":"Available Tonight"}
+              </p>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                {effectiveTimes.map(t=><TimePill key={t} t={t} onSelect={isTop?t=>onTime&&onTime(t):null}/>)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── RESTAURANT DETAIL SHEET ── */
+function Stars({rating,size=11}){
+  return <span style={{fontSize:size,letterSpacing:1}}>{[1,2,3,4,5].map(i=><span key={i} style={{color:i<=Math.round(rating||0)?"#FFB800":"#E0E0E0"}}>★</span>)}</span>;
+}
+
+function RestaurantDetailSheet({r,amexLinked,onReserve,onClose}){
+  const[data,setData]=useState(null);
+  const[loading,setLoading]=useState(true);
+  const[photoIdx,setPhotoIdx]=useState(0);
+  const[showHours,setShowHours]=useState(false);
+  const effectiveTimes=r.notifyOnly?(amexLinked?r.gdaTimes:[]):r.times;
+
+  useEffect(()=>{
+    window._placeCache=window._placeCache||{};
+    if(window._placeCache[r.id]){setData(window._placeCache[r.id]);setLoading(false);return;}
+    fetch(`/api/place-details?name=${encodeURIComponent(r.name)}`)
+      .then(res=>res.ok?res.json():null)
+      .then(d=>{if(d){window._placeCache[r.id]=d;setData(d);}setLoading(false);})
+      .catch(()=>setLoading(false));
+  },[r.id,r.name]);
+
+  const photos=data?.photos||[];
+  const reviews=data?.reviews||[];
+  const photoSrc=i=>photos[i]?`/api/place-photo?ref=${encodeURIComponent(photos[i].ref)}`:null;
+
+  return(
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.62)",zIndex:88,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}>
+      <div style={{background:"#FFF",borderRadius:"22px 22px 0 0",maxHeight:"92vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+
+        {/* Drag handle */}
+        <div style={{padding:"10px 0 0",display:"flex",justifyContent:"center",flexShrink:0}}>
+          <div style={{width:36,height:4,background:"#E0E0E0",borderRadius:2}}/>
+        </div>
+
+        {/* Photo carousel */}
+        <div style={{position:"relative",height:210,flexShrink:0,margin:"10px 0 0",background:"#F0F0F0"}}>
+          {photos.length>0&&photoSrc(photoIdx)
+            ?<img src={photoSrc(photoIdx)} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={r.name}/>
+            :<div style={{width:"100%",height:"100%"}}><RestaurantImg r={r}/></div>}
+          {/* Nav arrows */}
+          {photos.length>1&&<>
+            <button onClick={e=>{e.stopPropagation();setPhotoIdx(i=>(i-1+photos.length)%photos.length);}} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,0.38)",border:"none",color:"#FFF",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+            <button onClick={e=>{e.stopPropagation();setPhotoIdx(i=>(i+1)%photos.length);}} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,0.38)",border:"none",color:"#FFF",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+            <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",display:"flex",gap:4}}>
+              {photos.map((_,i)=><div key={i} style={{width:i===photoIdx?18:6,height:6,borderRadius:3,background:i===photoIdx?"#FFF":"rgba(255,255,255,0.45)",transition:"width 0.2s"}}/>)}
+            </div>
+          </>}
+          {loading&&<div style={{position:"absolute",inset:0,background:"rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center"}}><div className="spinner" style={{borderTopColor:"#FF4438"}}/></div>}
+        </div>
+
+        {/* Scrollable body */}
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px 110px"}}>
+
+          {/* Name + meta */}
+          <h2 style={{fontSize:21,fontWeight:800,color:"#1A1A1A",margin:"0 0 3px",letterSpacing:"-0.5px"}}>{r.name}</h2>
+          <p style={{fontSize:12,color:"#AAAAAA",margin:"0 0 10px"}}>{r.cuisine} · {r.hood} · {r.price}</p>
+
+          {/* Google rating */}
+          {data?.rating&&(
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12,padding:"9px 12px",background:"#F7F5F0",borderRadius:10}}>
+              <Stars rating={data.rating} size={13}/>
+              <span style={{fontSize:14,fontWeight:800,color:"#1A1A1A"}}>{data.rating.toFixed(1)}</span>
+              <span style={{fontSize:12,color:"#AAAAAA"}}>({data.reviewCount?.toLocaleString()} Google reviews)</span>
+            </div>
+          )}
+          {loading&&!data&&<div style={{height:40,background:"#F0F0F0",borderRadius:10,marginBottom:12}}/>}
+
+          {/* Open / hours */}
+          {data&&(
+            <div style={{marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:data.isOpen?"#22C55E":"#EF4444",flexShrink:0}}/>
+                <span style={{fontSize:13,fontWeight:700,color:data.isOpen?"#22C55E":"#EF4444"}}>{data.isOpen===null?"Hours unknown":data.isOpen?"Open now":"Closed now"}</span>
+                {data.hours.length>0&&<button onClick={()=>setShowHours(h=>!h)} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"#AAAAAA",padding:0,marginLeft:2}}>{showHours?"Hide hours ▲":"See hours ▼"}</button>}
+              </div>
+              {showHours&&data.hours.length>0&&(
+                <div style={{background:"#F7F7F7",borderRadius:8,padding:"9px 12px",marginTop:6}}>
+                  {data.hours.map((h,i)=><p key={i} style={{fontSize:11,color:"#555",margin:"2px 0",lineHeight:1.5}}>{h}</p>)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Editorial summary */}
+          {data?.summary&&(
+            <div style={{background:"#F7F5F0",borderRadius:10,padding:"10px 13px",marginBottom:14}}>
+              <p style={{fontSize:12,color:"#555",margin:0,lineHeight:1.65,fontStyle:"italic"}}>"{data.summary}"</p>
+            </div>
+          )}
+
+          {/* Reviews */}
+          {reviews.length>0&&(
+            <div style={{marginBottom:16}}>
+              <p style={{fontSize:9,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.3px",color:"#AAAAAA",margin:"0 0 10px"}}>What people say</p>
+              {reviews.slice(0,3).map((rev,i)=>(
+                <div key={i} style={{marginBottom:13,paddingBottom:13,borderBottom:i<2?"1px solid #F3F3F3":"none"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
+                    <div style={{width:30,height:30,borderRadius:"50%",background:"#1C1C1E",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <span style={{color:"#FFF",fontSize:12,fontWeight:700}}>{(rev.author||"?")[0].toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <p style={{fontSize:12,fontWeight:700,color:"#1A1A1A",margin:"0 0 1px"}}>{rev.author}</p>
+                      <div style={{display:"flex",alignItems:"center",gap:5}}>
+                        <Stars rating={rev.rating} size={10}/>
+                        <span style={{fontSize:10,color:"#BBBBBB"}}>{rev.time}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p style={{fontSize:12,color:"#555",margin:0,lineHeight:1.65}}>{rev.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Address + contact */}
+          {(data?.address||data?.phone)&&(
+            <div>
+              <p style={{fontSize:9,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.3px",color:"#AAAAAA",margin:"0 0 8px"}}>Location & Contact</p>
+              {data.address&&<p style={{fontSize:12,color:"#555",margin:"0 0 4px",lineHeight:1.5}}>{data.address}</p>}
+              {data.phone&&<a href={`tel:${data.phone}`} style={{fontSize:12,color:"#006FCF",textDecoration:"none"}}>{data.phone}</a>}
+            </div>
+          )}
+        </div>
+
+        {/* Fixed bottom CTA */}
+        <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"10px 20px 36px",background:"linear-gradient(to top,#FFF 75%,rgba(255,255,255,0))",display:"flex",gap:9}}>
+          {effectiveTimes.length>0&&(
+            <button onClick={()=>{onClose();onReserve(r,effectiveTimes[0]);}} style={{flex:1,padding:14,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+              Reserve · {effectiveTimes[0]}
+            </button>
+          )}
+          {data?.website&&(
+            <a href={data.website} target="_blank" rel="noopener noreferrer"
+              style={{width:46,height:46,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,background:"#FFF",border:"1.5px solid #EEEEEE",color:"#555",fontSize:18,textDecoration:"none",flexShrink:0}}>↗</a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── TIME PICKER SHEET ── */
+function TimePickerSheet({r,onSelect}){
+  const times=r.times.length>0?r.times:r.gdaTimes;
+  const[picked,setPicked]=useState(null);
+  const confirm=(t)=>{setPicked(t);setTimeout(()=>onSelect(t),160);};
+  return(
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.48)",zIndex:95,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",padding:"20px 20px 42px"}}>
+        <div style={{width:36,height:4,background:"#E0E0E0",borderRadius:2,margin:"0 auto 16px"}}/>
+        {/* Restaurant mini card */}
+        <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:18,padding:"10px 12px",background:"#F7F5F0",borderRadius:12}}>
+          <div style={{width:44,height:44,borderRadius:8,overflow:"hidden",flexShrink:0}}><RestaurantImg r={r}/></div>
+          <div>
+            <p style={{fontSize:13,fontWeight:700,color:"#1A1A1A",margin:"0 0 1px"}}>{r.name}</p>
+            <p style={{fontSize:11,color:"#AAAAAA",margin:0}}>{r.cuisine} · {r.hood}</p>
+          </div>
+        </div>
+        <p style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.3px",color:"#AAAAAA",margin:"0 0 12px"}}>Which time works for you?</p>
+        <div style={{display:"flex",flexWrap:"wrap",gap:9,marginBottom:14}}>
+          {times.map(t=>(
+            <button key={t} onClick={()=>confirm(t)} style={{
+              padding:"11px 20px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",transition:"all 0.12s",
+              background:picked===t?"#FF4438":"#FFF",color:picked===t?"#FFF":"#1A1A1A",
+              border:`1.5px solid ${picked===t?"#FF4438":"#EEEEEE"}`,
+            }}>{t}</button>
+          ))}
+        </div>
+        <button onClick={()=>onSelect(null)} style={{width:"100%",padding:12,borderRadius:10,background:"none",border:"1.5px solid #EEEEEE",color:"#999",fontSize:13,cursor:"pointer"}}>
+          No preference — any time works
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── AMEX PROMO SHEET ── */
+function AmexPromoSheet({onClose}){
+  const AMEX_URL="https://www.americanexpress.com/en-us/credit-cards/offers/resy/";
+  const cards=[
+    {
+      name:"Platinum Card®",
+      color:"#8B8B8B",
+      gradient:"linear-gradient(135deg,#B0B0B0 0%,#6E6E6E 50%,#9A9A9A 100%)",
+      tag:"Most Benefits",
+      tagColor:"#FF4438",
+      perks:[
+        {icon:"💰","text":"$100 dining credit every quarter"},
+        {icon:"⭑","text":"Global Dining Access — unlock exclusive reservations"},
+        {icon:"🎩","text":"Resy concierge & priority booking"},
+        {icon:"🥂","text":"Complimentary amenities at partner restaurants"},
+      ],
+    },
+    {
+      name:"Gold Card®",
+      color:"#C89B3C",
+      gradient:"linear-gradient(135deg,#D4A84B 0%,#9A6F1E 50%,#C89B3C 100%)",
+      tag:"Great Value",
+      tagColor:"#C89B3C",
+      perks:[
+        {icon:"💰","text":"$50 semi-annual Resy dining credit"},
+        {icon:"⭑","text":"Priority access to Resy partner restaurants"},
+        {icon:"🍽️","text":"4× Membership Rewards® at restaurants"},
+      ],
+    },
+  ];
+  return(
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.52)",zIndex:115,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}>
+      <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",maxHeight:"88vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{padding:"16px 20px 12px",flexShrink:0}}>
+          <div style={{width:36,height:4,background:"#E0E0E0",borderRadius:2,margin:"0 auto 16px"}}/>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
+                <div style={{width:22,height:22,background:"linear-gradient(135deg,#006FCF,#00338D)",borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{color:"#FFF",fontSize:11,fontWeight:900}}>✦</span>
+                </div>
+                <span style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.4px",color:"#006FCF"}}>American Express</span>
+              </div>
+              <h2 style={{fontSize:20,fontWeight:800,color:"#1A1A1A",margin:"0 0 3px",letterSpacing:"-0.4px"}}>Unlock Dining Benefits</h2>
+              <p style={{fontSize:12,color:"#AAAAAA",margin:0}}>Exclusive perks for Resy members through Global Dining Access</p>
+            </div>
+            <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}>
+              <Svg d={I.x} size={18} stroke="#CCCCCC"/>
+            </button>
+          </div>
+        </div>
+
+        {/* Cards */}
+        <div style={{flex:1,overflowY:"auto",padding:"4px 20px 16px"}}>
+          {cards.map((card,ci)=>(
+            <div key={ci} style={{borderRadius:16,overflow:"hidden",marginBottom:12,boxShadow:"0 4px 20px rgba(0,0,0,0.10)"}}>
+              {/* Card face */}
+              <div style={{background:card.gradient,padding:"16px 18px 14px",position:"relative"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div>
+                    <p style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.7)",letterSpacing:"1.5px",textTransform:"uppercase",margin:"0 0 3px"}}>American Express</p>
+                    <p style={{fontSize:15,fontWeight:800,color:"#FFF",margin:0,letterSpacing:"-0.2px"}}>{card.name}</p>
+                  </div>
+                  <div style={{background:"rgba(255,255,255,0.18)",borderRadius:6,padding:"3px 8px",border:"1px solid rgba(255,255,255,0.3)"}}>
+                    <span style={{fontSize:9,fontWeight:800,color:"#FFF",letterSpacing:"0.5px"}}>{card.tag}</span>
+                  </div>
+                </div>
+                <div style={{marginTop:12,display:"flex",justifyContent:"flex-end"}}>
+                  <span style={{fontSize:22,color:"rgba(255,255,255,0.4)",fontWeight:900,letterSpacing:"-1px"}}>✦</span>
+                </div>
+              </div>
+              {/* Perks list */}
+              <div style={{background:"#FAFAFA",padding:"12px 16px"}}>
+                {card.perks.map((p,pi)=>(
+                  <div key={pi} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"5px 0",borderBottom:pi<card.perks.length-1?"1px solid #F0F0F0":"none"}}>
+                    <span style={{fontSize:13,flexShrink:0,lineHeight:"20px"}}>{p.icon}</span>
+                    <p style={{fontSize:12,color:"#444",margin:0,lineHeight:1.5,fontWeight:500}}>{p.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Disclaimer */}
+          <p style={{fontSize:10,color:"#CCCCCC",textAlign:"center",lineHeight:1.6,margin:"4px 0 16px"}}>
+            Terms apply. Credits issued as statement credits. See americanexpress.com for full details.
+          </p>
+        </div>
+
+        {/* CTA */}
+        <div style={{padding:"12px 20px 36px",borderTop:"1px solid #F0F0F0",flexShrink:0}}>
+          <a href={AMEX_URL} target="_blank" rel="noopener noreferrer"
+            style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",padding:14,borderRadius:12,background:"#006FCF",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer",textDecoration:"none",boxSizing:"border-box"}}>
+            <span>✦</span> Learn More &amp; Apply
+          </a>
+          <p style={{fontSize:10,color:"#CCCCCC",textAlign:"center",margin:"8px 0 0"}}>americanexpress.com/resy</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── FILTER SHEET ── */
+function FilterSheet({filters,onApply,onClose,totalCount}){
+  const[f,setF]=useState(filters);
+  const preview=applyFilters(RESTAURANTS,f).length;
+
+  const toggleArr=(key,val)=>setF(p=>({...p,[key]:p[key].includes(val)?p[key].filter(x=>x!==val):[...p[key],val]}));
+  const set=(key,val)=>setF(p=>({...p,[key]:p[key]===val?null:val}));
+
+  const Section=({label,children})=>(
+    <div style={{marginBottom:20}}>
+      <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1.3px",color:"#AAAAAA",margin:"0 0 10px"}}>{label}</p>
+      {children}
+    </div>
+  );
+
+  const chipRow=(items,key,isArr=true)=>(
+    <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+      {items.map(({id,label})=>{
+        const active=isArr?f[key].includes(id):f[key]===id;
+        return<button key={id} onClick={()=>isArr?toggleArr(key,id):set(key,id)}
+          style={{padding:"7px 14px",borderRadius:99,border:`1.5px solid ${active?"#FF4438":"#E8E8E8"}`,background:active?"#FF4438":"#FFF",color:active?"#FFF":"#1A1A1A",fontSize:13,fontWeight:active?600:400,cursor:"pointer",transition:"all 0.14s",whiteSpace:"nowrap"}}>
+          {label}
+        </button>;
+      })}
+    </div>
+  );
+
+  return(
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.42)",zIndex:100,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}>
+      <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",maxHeight:"86vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+        {/* Handle */}
+        <div style={{padding:"14px 20px 10px",borderBottom:"1px solid #F0F0F0",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+          <div style={{width:36,height:4,background:"#E0E0E0",borderRadius:2,position:"absolute",left:"50%",transform:"translateX(-50%)",top:10}}/>
+          <span style={{fontSize:17,fontWeight:700,color:"#1A1A1A"}}>Filters</span>
+          <button onClick={()=>setF(DEFAULT_FILTERS)} style={{background:"none",border:"none",color:"#FF4438",fontSize:14,fontWeight:600,cursor:"pointer"}}>Clear all</button>
+        </div>
+
+        <div style={{flex:1,overflowY:"auto",padding:"20px 20px 10px"}}>
+
+          <Section label="Group Size">
+            {chipRow([
+              {id:"solo",label:"Just Me"},
+              {id:"couple",label:"Couple"},
+              {id:"small",label:"3–5 People"},
+              {id:"large",label:"6–10 People"},
+              {id:"party",label:"Party 10+"},
+            ],"groupSize",false)}
+          </Section>
+
+          <Section label="Ambiance">
+            {chipRow([
+              {id:"romantic",label:"Romantic"},
+              {id:"casual",label:"Casual"},
+              {id:"lively",label:"Lively"},
+              {id:"quiet",label:"Quiet"},
+              {id:"sports bar",label:"Sports Bar"},
+              {id:"outdoor",label:"Outdoor"},
+              {id:"business",label:"Business"},
+              {id:"upscale",label:"Upscale"},
+            ],"ambiance")}
+          </Section>
+
+          <Section label="Cuisine">
+            {chipRow([
+              {id:"all",label:"All"},
+              {id:"italian",label:"Italian"},
+              {id:"american",label:"American"},
+              {id:"mexican",label:"Mexican"},
+              {id:"mediterranean",label:"Mediterranean"},
+              {id:"pizza",label:"Pizza"},
+            ],"cuisine",false)}
+          </Section>
+
+          <Section label="Price">
+            {chipRow([{id:"$",label:"$"},{id:"$$",label:"$$"},{id:"$$$",label:"$$$"},{id:"$$$$",label:"$$$$"}],"price")}
+          </Section>
+
+          <Section label="Dietary">
+            {chipRow([
+              {id:"vegetarian-friendly",label:"Vegetarian Friendly"},
+              {id:"gluten-free-friendly",label:"Gluten-Free Friendly"},
+            ],"dietary")}
+          </Section>
+
+        </div>
+
+        <div style={{padding:"14px 20px 36px",borderTop:"1px solid #F0F0F0",flexShrink:0}}>
+          <button onClick={()=>onApply(f)} style={{width:"100%",padding:15,borderRadius:12,background:preview>0?"#FF4438":"#E0E0E0",border:"none",color:preview>0?"#FFF":"#AAAAAA",fontSize:15,fontWeight:700,cursor:preview>0?"pointer":"default",transition:"all 0.2s"}}>
+            Show {preview} restaurant{preview!==1?"s":""}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── ONBOARDING MODAL ── */
+function OnboardingModal({onDone}){
+  const[step,setStep]=useState(0);
+  const[budget,setBudget]=useState(75);
+  const[dist,setDist]=useState("nearby");
+  const[vibe,setVibe]=useState("casual");
+  const[amexTier,setAmexTier]=useState("skip");
+  const next=()=>step<3?setStep(s=>s+1):onDone({budget,dist,vibe,amexTier:amexTier==="skip"?null:amexTier});
+  return(
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.46)",display:"flex",flexDirection:"column",justifyContent:"flex-end",zIndex:110}}>
+      <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",padding:"24px 22px 42px",maxHeight:"86vh",overflowY:"auto"}}>
+        <div style={{width:36,height:4,background:"#E8E8E8",borderRadius:2,margin:"0 auto 22px"}}/>
+        <div style={{height:2,background:"#F0F0F0",borderRadius:1,marginBottom:22,overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${(step+1)/4*100}%`,background:"#FF4438",borderRadius:1,transition:"width 0.32s ease"}}/>
+        </div>
+        {step===0&&<>
+          <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#FF4438",margin:"0 0 5px"}}>Discover · St. Charles</p>
+          <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>Set your preferences</h2>
+          <p style={{fontSize:14,color:"#999",margin:"0 0 24px",lineHeight:1.5}}>We'll show the right restaurants for tonight near Q Center.</p>
+          <div style={{marginBottom:28}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
+              <span style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",color:"#999"}}>Budget per person</span>
+              <span style={{fontSize:20,fontWeight:800,color:"#FF4438"}}>Up to ${budget}</span>
+            </div>
+            <input type="range" min="20" max="150" value={budget} onChange={e=>setBudget(+e.target.value)}/>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontSize:11,color:"#C8C8C8"}}><span>$20</span><span>$150</span></div>
+          </div>
+        </>}
+        {step===1&&<>
+          <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>How far will you go?</h2>
+          <p style={{fontSize:14,color:"#999",margin:"0 0 22px"}}>From Q Center, St. Charles IL.</p>
+          <div style={{display:"flex",gap:8,marginBottom:28}}>
+            {[["walking","Walking"],["nearby","Nearby"],["anywhere","Anywhere"]].map(([id,label])=>(
+              <Pill key={id} label={label} active={dist===id} onClick={()=>setDist(id)}/>
+            ))}
+          </div>
+        </>}
+        {step===2&&<>
+          <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>Tonight's vibe?</h2>
+          <p style={{fontSize:14,color:"#999",margin:"0 0 22px"}}>We'll tailor the feed to match the mood.</p>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:28}}>
+            {[["casual","Casual"],["date","Date Night"],["group","Group Dinner"],["special","Special Occasion"],["business","Business"]].map(([id,label])=>(
+              <Pill key={id} label={label} active={vibe===id} onClick={()=>setVibe(id)}/>
+            ))}
+          </div>
+        </>}
+        {step===3&&<>
+          <h2 style={{fontSize:23,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.6px",margin:"0 0 4px"}}>Connect your Amex card</h2>
+          <p style={{fontSize:14,color:"#999",margin:"0 0 10px",lineHeight:1.55}}>Unlock Priority Notify, Global Dining Access exclusive availability, and your quarterly dining credit.</p>
+          <div style={{background:"#FFF8F7",border:"1px solid #FFE0DC",borderRadius:10,padding:"10px 13px",marginBottom:18,display:"flex",gap:8,alignItems:"flex-start"}}>
+            <Svg d={I.star} size={13} stroke="#FF4438" fill="#FF4438" sw={0}/>
+            <p style={{fontSize:12,color:"#999",margin:0,lineHeight:1.5}}>Amex Platinum cardholders get <strong style={{color:"#1A1A1A"}}>Priority Notify</strong> and see exclusive time slots at sold-out restaurants like The Graceful Ordinary and Mio Modo.</p>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:22}}>
+            {[
+              {id:"platinum",label:"Amex Platinum",sub:"Priority Notify · GDA access · $100/quarter credit"},
+              {id:"gold",label:"Amex Gold",sub:"$50 semi-annual Resy credit"},
+              {id:"skip",label:"Skip for now",sub:"Standard Notify — no card benefits"},
+            ].map(opt=>(
+              <button key={opt.id} onClick={()=>setAmexTier(opt.id)} style={{width:"100%",padding:"13px 14px",borderRadius:11,textAlign:"left",cursor:"pointer",border:`1.5px solid ${amexTier===opt.id?"#FF4438":"#EEEEEE"}`,background:amexTier===opt.id?"#FFF5F4":"#FAFAFA",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all 0.15s"}}>
+                <div><p style={{fontSize:14,fontWeight:700,color:"#1A1A1A",margin:"0 0 2px"}}>{opt.label}</p><p style={{fontSize:11,color:"#999",margin:0}}>{opt.sub}</p></div>
+                {amexTier===opt.id&&<div style={{width:20,height:20,borderRadius:"50%",background:"#FF4438",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Svg d={I.check} size={11} stroke="#FFF" sw={2.5}/></div>}
+              </button>
+            ))}
+          </div>
+        </>}
+        <button onClick={next} style={{width:"100%",padding:15,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer",letterSpacing:"0.1px"}}>
+          {step<3?"Continue →":(amexTier&&amexTier!=="skip")?"Start Discovering · Amex Connected":"Start Discovering"}
+        </button>
+        {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{width:"100%",padding:"12px",marginTop:8,background:"none",border:"none",color:"#AAAAAA",fontSize:14,cursor:"pointer"}}>Back</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ── GROUP OVERLAY — real-time session ── */
+function GroupOverlay({onClose,onSessionStart}){
+  const[phase,setPhase]=useState("start");
+  const[code,setCode]=useState(null);
+  const[members,setMembers]=useState({});
+  const[creating,setCreating]=useState(false);
+  const[joinInput,setJoinInput]=useState("");
+  const[joinError,setJoinError]=useState(false);
+  const[userName,setUserName]=useState("");
+  const myId=useRef(getUID()).current;
+  const dbRef=useRef(null);
+  const isFirebase=!!window.resyDB;
+
+  const displayName=userName.trim()||"Guest";
+
+  const createSession=async()=>{
+    setCreating(true);
+    const c=genGroupCode();
+    setCode(c);
+    if(isFirebase){
+      const ref=window.resyDB.ref(`sessions/${c}`);
+      await ref.set({created:Date.now(),members:{[myId]:{joined:Date.now(),name:displayName}},swipes:{[myId]:{}}});
+      dbRef.current=ref;
+      ref.child("members").on("value",snap=>{if(snap.exists())setMembers(snap.val());});
+    } else {
+      setMembers({[myId]:{joined:Date.now(),name:displayName}});
+    }
+    setCreating(false);
+    setPhase("waiting");
+  };
+
+  const startSwiping=()=>{
+    if(dbRef.current) dbRef.current.child("members").off();
+    onSessionStart({code,myId,dbRef:dbRef.current,name:displayName});
+    onClose();
+  };
+
+  const joinByCode=()=>{
+    const raw=joinInput.trim().toUpperCase();
+    const c=raw.startsWith("RESY-")?raw:`RESY-${raw}`;
+    if(c.length<7){setJoinError(true);return;}
+    setJoinError(false);
+    onSessionStart({code:c,myId,dbRef:null,name:displayName});
+    onClose();
+  };
+
+  useEffect(()=>()=>{if(dbRef.current)dbRef.current.child("members").off();},[]);
+
+  const memberCount=Object.keys(members).length;
+  const groupUrl=`${window.location.origin}${window.location.pathname}?group=${code}`;
+  const qrSrc=code?`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(groupUrl)}&color=1A1A1A&bgcolor=FFFFFF`:null;
+
+  return(
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.46)",display:"flex",flexDirection:"column",justifyContent:"flex-end",zIndex:110}} onClick={onClose}>
+      <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",padding:"22px 20px 40px"}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:36,height:4,background:"#E8E8E8",borderRadius:2,margin:"0 auto 18px"}}/>
+
+        {phase==="start"&&<>
+          <h2 style={{fontSize:20,fontWeight:800,color:"#1A1A1A",margin:"0 0 8px"}}>Group Mode</h2>
+          <p style={{color:"#999",fontSize:13,lineHeight:1.6,margin:"0 0 6px"}}>
+            Everyone swipes independently. Tap <strong style={{color:"#FF4438"}}>Results</strong> anytime to see the live vote leaderboard and book the group's top pick.
+          </p>
+          {!isFirebase&&<p style={{fontSize:11,color:"#BBBBBB",margin:"0 0 6px",textAlign:"center"}}>Works across browser tabs · deploys to full multi-device with Firebase</p>}
+          <div style={{height:10}}/>
+          {/* Name input */}
+          <input
+            value={userName}
+            onChange={e=>setUserName(e.target.value)}
+            placeholder="Your name (e.g. Sagar)"
+            maxLength={24}
+            style={{width:"100%",padding:"12px 14px",borderRadius:10,border:"1.5px solid #EEEEEE",fontSize:14,color:"#1A1A1A",outline:"none",background:"#FAFAFA",boxSizing:"border-box",marginBottom:12}}
+          />
+          <button onClick={createSession} disabled={creating} style={{width:"100%",padding:15,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {creating&&<div className="spinner"/>}
+            {creating?"Creating session…":"Create Group Session"}
+          </button>
+
+          {/* Divider */}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+            <div style={{flex:1,height:1,background:"#EEEEEE"}}/>
+            <span style={{fontSize:11,color:"#CCCCCC",fontWeight:600,letterSpacing:"0.5px"}}>OR JOIN EXISTING</span>
+            <div style={{flex:1,height:1,background:"#EEEEEE"}}/>
+          </div>
+
+          {/* Join by code input */}
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <input
+              value={joinInput}
+              onChange={e=>{setJoinInput(e.target.value.toUpperCase());setJoinError(false);}}
+              onKeyDown={e=>e.key==="Enter"&&joinByCode()}
+              placeholder="Enter code — e.g. RESY-4A8C"
+              maxLength={12}
+              style={{flex:1,padding:"12px 14px",borderRadius:10,border:`1.5px solid ${joinError?"#FF4438":"#EEEEEE"}`,fontSize:14,fontWeight:600,letterSpacing:"1px",color:"#1A1A1A",outline:"none",background:"#FAFAFA"}}
+            />
+            <button onClick={joinByCode} style={{padding:"12px 16px",borderRadius:10,background:"#1A1A1A",border:"none",color:"#FFF",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+              Join
+            </button>
+          </div>
+          {joinError&&<p style={{fontSize:11,color:"#FF4438",margin:"0 0 10px",textAlign:"center"}}>Enter a valid code (e.g. RESY-4A8C)</p>}
+
+          <button onClick={onClose} style={{width:"100%",padding:12,borderRadius:12,background:"#FFF",border:"1.5px solid #EEEEEE",color:"#777",fontSize:14,cursor:"pointer"}}>Cancel</button>
+        </>}
+
+        {phase==="waiting"&&code&&<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <h2 style={{fontSize:18,fontWeight:800,color:"#1A1A1A",margin:0}}>Share & Join</h2>
+            <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Svg d={I.x} size={18} stroke="#AAAAAA"/></button>
+          </div>
+
+          {/* QR + code */}
+          <div style={{display:"flex",gap:14,marginBottom:14,alignItems:"center"}}>
+            <div style={{background:"#F7F5F0",borderRadius:14,padding:11,flexShrink:0}}>
+              {qrSrc
+                ?<img src={qrSrc} width={108} height={108} style={{display:"block",borderRadius:6}} alt="Group QR"/>
+                :<div style={{width:108,height:108,background:"#E5E5E5",borderRadius:6}}/>}
+            </div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"1.2px",color:"#AAAAAA",margin:"0 0 5px"}}>Session Code</p>
+              <div style={{fontSize:24,fontWeight:900,color:"#FF4438",letterSpacing:3,lineHeight:1}}>{code}</div>
+              <p style={{fontSize:11,color:"#AAAAAA",margin:"6px 0 10px",lineHeight:1.5}}>Scan the QR or share the code</p>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:memberCount>1?"#22C55E":"#FF9500",flexShrink:0,
+                  boxShadow:memberCount>1?"0 0 0 3px rgba(34,197,94,0.2)":"0 0 0 3px rgba(255,149,0,0.2)"}}/>
+                <span style={{fontSize:12,fontWeight:700,color:memberCount>1?"#22C55E":"#FF9500"}}>
+                  {memberCount} {memberCount===1?"member — waiting":"members ready"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Live member avatars */}
+          <div style={{background:"#F7F5F0",borderRadius:12,padding:"10px 14px",marginBottom:14,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",minHeight:50}}>
+            {Object.entries(members).map(([uid,m],i)=>(
+              <div key={uid} style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:30,height:30,borderRadius:"50%",background:uid===myId?"#FF4438":"#1C1C1E",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 6px rgba(0,0,0,0.14)"}}>
+                  <span style={{color:"#FFF",fontSize:11,fontWeight:800}}>{(m.name||"?")[0].toUpperCase()}</span>
+                </div>
+                <span style={{fontSize:12,fontWeight:uid===myId?700:500,color:uid===myId?"#FF4438":"#555"}}>
+                  {uid===myId?`${m.name||"You"} (you)`:m.name||`Guest ${i+1}`}
+                </span>
+              </div>
+            ))}
+            <span style={{fontSize:11,color:"#BBBBBB",marginLeft:"auto"}}>{isFirebase?"Live":"Local"}</span>
+          </div>
+
+          <button onClick={startSwiping} style={{width:"100%",padding:14,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer"}}>
+            Start Swiping · {memberCount} {memberCount===1?"Person":"People"}
+          </button>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+/* ── GROUP RESULTS OVERLAY ── */
+function GroupResultsOverlay({ranked,memberCount,groupMembers,groupSwipes,groupTimes,onBook,onClose}){
+  const medals=["🥇","🥈","🥉"];
+  const[expandedId,setExpandedId]=useState(null);
+
+  const getVoters=(r)=>Object.entries(groupMembers)
+    .filter(([uid])=>groupSwipes[uid]?.[r.id]==="right")
+    .map(([uid,m])=>({name:m.name||"Guest",time:groupTimes[uid]?.[r.id]||null}));
+
+  const topTime=(voters)=>{
+    const freq={};
+    voters.forEach(v=>{if(v.time)freq[v.time]=(freq[v.time]||0)+1;});
+    return Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;
+  };
+  return(
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.55)",zIndex:115,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}>
+      <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",maxHeight:"84vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{padding:"16px 20px 10px",borderBottom:"1px solid #F0F0F0",flexShrink:0}}>
+          <div style={{width:36,height:4,background:"#E0E0E0",borderRadius:2,margin:"0 auto 14px"}}/>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div>
+              <p style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"1.3px",color:"#AAAAAA",margin:"0 0 3px"}}>Group Results · {memberCount} voters</p>
+              <h2 style={{fontSize:19,fontWeight:800,color:"#1A1A1A",margin:0,letterSpacing:"-0.4px"}}>
+                {ranked.length>0?"The Group Has Spoken 🗳️":"No votes yet"}
+              </h2>
+            </div>
+            <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",padding:4,marginTop:2}}>
+              <Svg d={I.x} size={18} stroke="#BBBBBB"/>
+            </button>
+          </div>
+        </div>
+
+        {/* Rankings list */}
+        <div style={{flex:1,overflowY:"auto",padding:"8px 20px 12px"}}>
+          {ranked.length===0&&(
+            <div style={{textAlign:"center",padding:"40px 0"}}>
+              <div style={{fontSize:32,marginBottom:10}}>🗳️</div>
+              <p style={{color:"#AAAAAA",fontSize:14}}>No right swipes yet — keep going!</p>
+            </div>
+          )}
+          {ranked.map((r,i)=>{
+            const pct=memberCount>0?Math.round((r.votes/memberCount)*100):0;
+            const isWinner=i===0;
+            const isExpanded=expandedId===r.id;
+            const voters=getVoters(r);
+            const best=topTime(voters);
+            return(
+              <div key={r.id} style={{borderBottom:"1px solid #F7F7F7"}}>
+                {/* Main row */}
+                <div style={{display:"flex",gap:11,padding:"11px 0",alignItems:"center",cursor:"pointer"}} onClick={()=>setExpandedId(isExpanded?null:r.id)}>
+                  {/* Rank */}
+                  <div style={{width:28,textAlign:"center",flexShrink:0}}>
+                    {medals[i]?<span style={{fontSize:20}}>{medals[i]}</span>:<span style={{fontSize:13,fontWeight:700,color:"#CCCCCC"}}>{i+1}</span>}
+                  </div>
+                  {/* Photo */}
+                  <div style={{width:52,height:52,borderRadius:10,overflow:"hidden",flexShrink:0,
+                    boxShadow:isWinner?"0 3px 12px rgba(255,68,56,0.22)":"none",
+                    border:isWinner?"1.5px solid #FF4438":"1px solid #F0F0F0"}}>
+                    <RestaurantImg r={r}/>
+                  </div>
+                  {/* Info + bar */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:2}}>
+                      <p style={{fontSize:13,fontWeight:isWinner?800:600,color:isWinner?"#1A1A1A":"#333",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,marginRight:6}}>{r.name}</p>
+                      <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
+                        <span style={{fontSize:13,fontWeight:800,color:isWinner?"#FF4438":"#AAAAAA"}}>{r.votes}/{memberCount}</span>
+                        <span style={{fontSize:10,color:"#CCCCCC"}}>{isExpanded?"▲":"▼"}</span>
+                      </div>
+                    </div>
+                    <p style={{fontSize:10,color:"#BBBBBB",margin:"0 0 5px"}}>{r.cuisine} · {r.hood}</p>
+                    <div style={{height:5,background:"#F2F2F2",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:isWinner?"#FF4438":i===1?"#FF9500":i===2?"#FFD700":"#E0E0E0",borderRadius:3,transition:"width 0.5s cubic-bezier(0.175,0.885,0.32,1.275)"}}/>
+                    </div>
+                    {best&&<p style={{fontSize:9,color:"#22C55E",margin:"3px 0 0",fontWeight:700}}>Best time: {best}</p>}
+                  </div>
+                </div>
+                {/* Expanded voter list */}
+                {isExpanded&&(
+                  <div style={{background:"#F9F9F9",borderRadius:10,padding:"10px 12px",marginBottom:10}}>
+                    {voters.length===0
+                      ?<p style={{fontSize:12,color:"#BBBBBB",margin:0,textAlign:"center"}}>No right swipes yet</p>
+                      :voters.map((v,vi)=>(
+                        <div key={vi} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:vi<voters.length-1?"1px solid #F0F0F0":"none"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:7}}>
+                            <div style={{width:24,height:24,borderRadius:"50%",background:"#FF4438",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              <span style={{color:"#FFF",fontSize:10,fontWeight:800}}>{v.name[0].toUpperCase()}</span>
+                            </div>
+                            <span style={{fontSize:12,fontWeight:600,color:"#333"}}>{v.name}</span>
+                          </div>
+                          <span style={{fontSize:11,color:v.time?"#22C55E":"#CCCCCC",fontWeight:v.time?700:400}}>
+                            {v.time||"No preference"}
+                          </span>
+                        </div>
+                      ))
+                    }
+                    {best&&<div style={{marginTop:8,padding:"6px 10px",background:"rgba(34,197,94,0.08)",borderRadius:7,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:10,fontWeight:700,color:"#16A34A"}}>Most popular time</span>
+                      <span style={{fontSize:12,fontWeight:800,color:"#16A34A"}}>{best}</span>
+                    </div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* CTAs */}
+        <div style={{padding:"12px 20px 36px",borderTop:"1px solid #F0F0F0",flexShrink:0}}>
+          {ranked.length>0?(
+            <>
+              <button onClick={()=>onBook(ranked[0])} style={{width:"100%",padding:14,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:14,fontWeight:700,cursor:"pointer",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <span>{medals[0]}</span>Reserve {ranked[0].name}
+              </button>
+              <button onClick={onClose} style={{width:"100%",padding:12,borderRadius:12,background:"#FFF",border:"1.5px solid #EEEEEE",color:"#777",fontSize:14,cursor:"pointer"}}>
+                Keep Swiping
+              </button>
+            </>
+          ):(
+            <button onClick={onClose} style={{width:"100%",padding:14,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+              Back to Swiping
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── CONFIRMATION OVERLAY ── */
+function ConfirmationOverlay({r,code,userEmail,time,party,occasion,amexLinked,onViewReservations,onKeepBrowsing}){
+  const[vis,setVis]=useState(false);
+  useEffect(()=>{setTimeout(()=>setVis(true),60);},[]);
+  return(
+    <div style={{position:"absolute",inset:0,background:"#FFF",zIndex:95,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{flex:1,overflowY:"auto",padding:"52px 24px 24px",display:"flex",flexDirection:"column",alignItems:"center",opacity:vis?1:0,transition:"opacity 0.38s ease"}}>
+        <div className="pop-in" style={{width:72,height:72,borderRadius:"50%",background:"#22C55E",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:18,boxShadow:"0 8px 28px rgba(34,197,94,0.26)"}}>
+          <Svg d={I.check} size={34} stroke="#FFF" sw={2.5}/>
+        </div>
+        <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"1.5px",color:"#22C55E",margin:"0 0 6px"}}>Reservation Confirmed</p>
+        <h1 style={{fontSize:27,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.8px",margin:"0 0 4px",textAlign:"center"}}>{r.name}</h1>
+        <p style={{color:"#999",fontSize:14,margin:"0 0 22px"}}>{r.cuisine} · {r.hood}</p>
+        <div style={{borderRadius:14,overflow:"hidden",height:140,width:"100%",marginBottom:18}}>
+          <RestaurantImg r={r}/>
+        </div>
+        <div style={{background:"#F7F5F0",borderRadius:14,padding:16,width:"100%",marginBottom:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,textAlign:"center"}}>
+            {[["Date","Tonight"],["Time",time],["Guests",`${party}`]].map(([l,v])=>(
+              <div key={l}>
+                <p style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#AAAAAA",margin:"0 0 4px"}}>{l}</p>
+                <p style={{fontSize:14,fontWeight:700,color:"#1A1A1A",margin:0}}>{v}</p>
+              </div>
+            ))}
+          </div>
+          {occasion&&<div style={{borderTop:"1px solid #E8E8E8",marginTop:12,paddingTop:12,textAlign:"center"}}>
+            <p style={{fontSize:12,color:"#999",margin:0}}>Occasion: <strong style={{color:"#1A1A1A"}}>{occasion}</strong></p>
+          </div>}
+        </div>
+        {amexLinked&&<div style={{background:"#FFF5F4",border:"1px solid #FFD0CC",borderRadius:10,padding:"11px 14px",width:"100%",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+          <Svg d={I.star} size={13} stroke="#FF4438" fill="#FF4438" sw={0}/>
+          <p style={{fontSize:12,fontWeight:700,color:"#FF4438",margin:0}}>$100 Resy Credit · Applied Automatically</p>
+        </div>}
+        <div style={{border:"1.5px solid #EEEEEE",borderRadius:12,padding:"16px 20px",width:"100%",textAlign:"center",marginBottom:14}}>
+          <p style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"1.5px",color:"#AAAAAA",margin:"0 0 5px"}}>Confirmation Code</p>
+          <p style={{fontSize:26,fontWeight:900,color:"#FF4438",letterSpacing:"4px",margin:0}}>{code}</p>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <Svg d={I.mail} size={14} stroke="#22C55E"/>
+          <p style={{fontSize:12,color:"#999",margin:0}}>Sent to <strong style={{color:"#1A1A1A"}}>{userEmail}</strong></p>
+        </div>
+      </div>
+      <div style={{padding:"14px 22px 36px",borderTop:"1px solid #F0F0F0",display:"flex",flexDirection:"column",gap:10,flexShrink:0}}>
+        <button onClick={onViewReservations} style={{width:"100%",padding:15,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer"}}>View My Reservations</button>
+        <button onClick={onKeepBrowsing} style={{width:"100%",padding:13,borderRadius:12,background:"#FFF",border:"1.5px solid #EEEEEE",color:"#1A1A1A",fontSize:14,fontWeight:600,cursor:"pointer"}}>Keep Discovering</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── MATCH / BOOKING SCREEN ── */
+function MatchScreen({r,time,amexLinked,onBack,onBookingConfirmed,goToReservations}){
+  const[vis,setVis]=useState(false);
+  const[party,setParty]=useState(2);
+  const[occasion,setOccasion]=useState(null);
+  const[note,setNote]=useState("");
+  const[name,setName]=useState("");
+  const[email,setEmail]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState("");
+  const[confirmed,setConfirmed]=useState(null);
+  useEffect(()=>{setTimeout(()=>setVis(true),40);},[]);
+
+  const bookingDate=useMemo(()=>new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}),[]);
+  const validEmail=/^\S+@\S+\.\S+$/.test(email);
+  const canConfirm=name.trim()&&validEmail&&!loading;
+
+  const handleConfirm=async()=>{
+    if(!canConfirm)return;
+    setError("");setLoading(true);
+    const code="RSY"+Math.floor(100000+Math.random()*900000);
+    try{
+      const isServer=window.location.hostname==="localhost"&&window.location.port==="3000";
+      if(isServer){
+        const res=await fetch("/api/send-reservation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.trim(),email,restaurant:r.name,cuisine:r.cuisine,hood:r.hood,date:bookingDate,time,guests:party,occasion:occasion||null,note:note.trim()||null,amexLinked})});
+        const data=await res.json();
+        if(!res.ok)throw new Error(data.detail||data.error||"Server error");
+      } else {
+        if(window.EMAILJS_PUBLIC_KEY==="YOUR_PUBLIC_KEY")throw new Error("EmailJS not configured — replace the placeholder keys at the top of this file.");
+        await emailjs.send(window.EMAILJS_SERVICE_ID,window.EMAILJS_TEMPLATE_ID,{
+          to_name:name.trim(),to_email:email,
+          restaurant:r.name,cuisine:r.cuisine,hood:r.hood,
+          date:bookingDate,time,guests:`${party} ${party===1?"guest":"guests"}`,
+          occasion:occasion||"—",note:note.trim()||"—",
+          amex_credit:amexLinked?"★ Amex Platinum · $100 Resy Credit Applied Automatically":"",
+          confirmation_code:code,
+        });
+      }
+      onBookingConfirmed&&onBookingConfirmed({r,time,party,occasion,code,date:bookingDate});
+      setConfirmed({code,email});
+    }catch(err){
+      const detail=err?.text||err?.message||JSON.stringify(err);
+      setError("Could not send confirmation: "+detail);
+    }finally{setLoading(false);}
+  };
+
+  if(confirmed)return<ConfirmationOverlay r={r} code={confirmed.code} userEmail={confirmed.email} time={time} party={party} occasion={occasion} amexLinked={amexLinked} onViewReservations={goToReservations} onKeepBrowsing={onBack}/>;
+
+  return(
+    <div style={{position:"absolute",inset:0,background:"#FFF",zIndex:80,display:"flex",flexDirection:"column"}}>
+      <div style={{flex:1,overflowY:"auto",padding:"50px 20px 22px",opacity:vis?1:0,transform:vis?"none":"translateY(14px)",transition:"all 0.4s cubic-bezier(0.175,0.885,0.32,1.275)"}}>
+        {amexLinked&&<div style={{background:"#FFF5F4",border:"1px solid #FFD0CC",borderRadius:10,padding:"10px 14px",marginBottom:18,display:"flex",alignItems:"center",gap:9}}>
+          <Svg d={I.star} size={14} stroke="#FF4438" fill="#FF4438" sw={0}/>
+          <div>
+            <p style={{fontSize:12,fontWeight:700,color:"#FF4438",margin:"0 0 1px"}}>$100 Resy Credit · Eligible</p>
+            <p style={{fontSize:11,color:"#AAAAAA",margin:0}}>Amex Platinum quarterly dining credit applies automatically</p>
+          </div>
+        </div>}
+        <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1.5px",color:"#FF4438",margin:"0 0 5px"}}>Confirm Reservation</p>
+        <h1 style={{fontSize:26,fontWeight:800,color:"#1A1A1A",letterSpacing:"-0.8px",margin:"0 0 3px"}}>{r.name}</h1>
+        <p style={{color:"#999",fontSize:13,margin:"0 0 16px"}}>{r.cuisine} · {r.hood}</p>
+        <div style={{borderRadius:14,overflow:"hidden",height:150,marginBottom:16}}>
+          <RestaurantImg r={r}/>
+        </div>
+        <div style={{background:"#F7F5F0",borderRadius:13,padding:16,marginBottom:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            {[["DATE",bookingDate],["TIME",time||r.times[0]||r.gdaTimes[0]]].map(([l,v])=>(
+              <div key={l}><p style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#AAAAAA",margin:"0 0 4px"}}>{l}</p><p style={{fontSize:14,fontWeight:700,color:"#1A1A1A",margin:0}}>{v}</p></div>
+            ))}
+          </div>
+          <p style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#AAAAAA",margin:"0 0 9px"}}>Party Size</p>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <button onClick={()=>setParty(p=>Math.max(1,p-1))} style={{width:32,height:32,borderRadius:"50%",border:"1.5px solid #E8E8E8",background:"#FFF",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Svg d={I.minus} size={14} stroke="#1A1A1A" sw={2}/></button>
+            <span style={{fontSize:17,fontWeight:700,color:"#1A1A1A",minWidth:24,textAlign:"center"}}>{party}</span>
+            <button onClick={()=>setParty(p=>Math.min(20,p+1))} style={{width:32,height:32,borderRadius:"50%",border:"1.5px solid #E8E8E8",background:"#FFF",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Svg d={I.plus} size={14} stroke="#1A1A1A" sw={2}/></button>
+            <span style={{fontSize:13,color:"#AAAAAA",marginLeft:4}}>{party===1?"guest":"guests"}</span>
+          </div>
+        </div>
+        <div style={{marginBottom:14}}>
+          <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#AAAAAA",margin:"0 0 10px"}}>Occasion (optional)</p>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            {["Birthday","Anniversary","Business","Celebration","Date Night","Just Dinner"].map(o=>(
+              <Pill key={o} label={o} active={occasion===o} onClick={()=>setOccasion(occasion===o?null:o)} sm/>
+            ))}
+          </div>
+        </div>
+        <div style={{marginBottom:16}}>
+          <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#AAAAAA",margin:"0 0 8px"}}>Note to restaurant (optional)</p>
+          <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Dietary restrictions, seating preferences, celebrations..." rows={2}
+            style={{width:"100%",padding:"11px 13px",borderRadius:10,border:"1.5px solid #EEEEEE",background:"#FAFAFA",fontSize:13,color:"#1A1A1A",lineHeight:1.55,boxSizing:"border-box"}}/>
+        </div>
+        <div style={{borderTop:"1px solid #F0F0F0",paddingTop:16,display:"flex",flexDirection:"column",gap:11}}>
+          <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#AAAAAA",margin:0}}>Your Details · Confirmation Email</p>
+          <Field label="Full Name" value={name} onChange={setName} placeholder="Jane Doe" icon="user"/>
+          <Field label="Email Address" value={email} onChange={setEmail} type="email" placeholder="jane@example.com" icon="mail"/>
+        </div>
+        {error&&<div style={{marginTop:12,padding:"11px 14px",borderRadius:10,background:"#FFF0EE",border:"1px solid #FFD0CC"}}>
+          <p style={{fontSize:12,color:"#CC2200",margin:0}}>{error}</p>
+        </div>}
+      </div>
+      <div style={{padding:"13px 20px 34px",borderTop:"1px solid #F0F0F0",display:"flex",flexDirection:"column",gap:10,flexShrink:0}}>
+        <button onClick={handleConfirm} disabled={!canConfirm}
+          style={{width:"100%",padding:15,borderRadius:12,background:canConfirm?"#FF4438":"#F0F0F0",border:"none",color:canConfirm?"#FFF":"#BBBBB",fontSize:15,fontWeight:700,cursor:canConfirm?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.2s"}}>
+          {loading&&<div className="spinner"/>}
+          {loading?"Sending confirmation…":"Confirm Reservation"}
+        </button>
+        <button onClick={onBack} style={{width:"100%",padding:13,borderRadius:12,background:"#FFF",border:"1.5px solid #EEEEEE",color:"#1A1A1A",fontSize:14,fontWeight:600,cursor:"pointer"}}>Keep Browsing</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── AMEX STATUS BAR ── */
+const AmexBar=({tier})=>(
+  <div style={{background:"#FFF5F4",borderBottom:"1px solid #FFE8E6",padding:"7px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <div style={{width:6,height:6,borderRadius:"50%",background:"#FF4438"}}/>
+      <span style={{fontSize:11,fontWeight:700,color:"#FF4438"}}>Amex {tier==="platinum"?"Platinum":"Gold"} Connected</span>
+    </div>
+    <span style={{fontSize:11,color:"#AAAAAA"}}>Priority Notify · GDA Enabled</span>
+  </div>
+);
+
+/* ── DISCOVER SCREEN ── */
+function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
+  const[showOnboard,setShowOnboard]=useState(true);
+  const[prefs,setPrefs]=useState(null);
+  const[filters,setFilters]=useState(DEFAULT_FILTERS);
+  const[showFilter,setShowFilter]=useState(false);
+  const[idx,setIdx]=useState(0);
+  const[match,setMatch]=useState(null);
+  const[matchTime,setMatchTime]=useState(null);
+  const[showGroup,setShowGroup]=useState(false);
+  const[showAmexPromo,setShowAmexPromo]=useState(false);
+  const[detailR,setDetailR]=useState(null);
+  const[trigger,setTrigger]=useState(null);
+  const[notifyR,setNotifyR]=useState(null);
+
+  // ── Group session state ──
+  const[groupSession,setGroupSession]=useState(null); // {code, myId}
+  const[groupMembers,setGroupMembers]=useState({});   // {uid: {joined}}
+  const[groupSwipes,setGroupSwipes]=useState({});     // {uid: {restaurantId: "right"|"left"}}
+  const[joinPrompt,setJoinPrompt]=useState(null);     // group code from URL ?group=
+  const[showGroupResults,setShowGroupResults]=useState(false);
+  const[groupTimes,setGroupTimes]=useState({});  // {uid:{rId:"7:00 PM"}}
+  const[pendingTimeR,setPendingTimeR]=useState(null); // restaurant awaiting time pick
+  const[joinName,setJoinName]=useState("");
+  const groupDBRef=useRef(null);
+  const storageLstnRef=useRef(null); // localStorage storage-event listener
+  const myUID=useRef(getUID()).current;
+
+  // Attach a storage-event listener that keeps group state live across tabs
+  const attachStorageListener=useCallback((code)=>{
+    if(storageLstnRef.current) window.removeEventListener("storage",storageLstnRef.current);
+    const fn=(e)=>{
+      if(e.key!==`resy-session-${code}`)return;
+      try{
+        const d=JSON.parse(e.newValue||"{}");
+        if(d.members) setGroupMembers(d.members);
+        if(d.swipes)  setGroupSwipes(d.swipes);
+        if(d.times)   setGroupTimes(d.times);
+      }catch(_){}
+    };
+    storageLstnRef.current=fn;
+    window.addEventListener("storage",fn);
+  },[]);
+
+  const amexLinked=prefs?.amexTier==="platinum";
+  const filtered=useMemo(()=>applyFilters(RESTAURANTS,filters),[filters]);
+  const visible=filtered.slice(idx,idx+3);
+  const remaining=filtered.length-idx;
+
+  const activeFilterCount=useMemo(()=>{
+    let c=0;
+    if(filters.groupSize)c++;
+    c+=filters.ambiance.length;
+    if(filters.cuisine&&filters.cuisine!=="all")c++;
+    c+=filters.price.length;
+    c+=filters.dietary.length;
+    return c;
+  },[filters]);
+
+  // Reset idx when filters change
+  useEffect(()=>setIdx(0),[filters]);
+
+  // URL param: auto-prompt join when ?group=CODE is present
+  useEffect(()=>{
+    const p=new URLSearchParams(window.location.search);
+    const gc=p.get("group");
+    if(gc) setJoinPrompt(gc);
+  },[]);
+
+  // Compute vote counts per restaurant from all members' right swipes
+  const groupVotes=useMemo(()=>{
+    const counts={};
+    RESTAURANTS.forEach(r=>{counts[r.id]=0;});
+    Object.values(groupSwipes).forEach(memberSwipes=>{
+      Object.entries(memberSwipes||{}).forEach(([rid,dir])=>{
+        if(dir==="right") counts[parseInt(rid)]=(counts[parseInt(rid)]||0)+1;
+      });
+    });
+    return counts;
+  },[groupSwipes]);
+
+  const sortedByVotes=useMemo(()=>{
+    return [...RESTAURANTS]
+      .map(r=>({...r,votes:groupVotes[r.id]||0}))
+      .filter(r=>r.votes>0)
+      .sort((a,b)=>b.votes-a.votes);
+  },[groupVotes]);
+
+  const topPick=sortedByVotes[0]||null;
+
+  const handleSessionStart=useCallback(({code,myId,dbRef,name})=>{
+    const displayName=name||"Guest";
+    const initialMembers={[myId]:{joined:Date.now(),name:displayName}};
+    setGroupSession({code,myId});
+    setGroupMembers(initialMembers);
+    onGroupSession&&onGroupSession(code);
+    if(dbRef){
+      // Firebase path
+      groupDBRef.current=dbRef;
+      dbRef.child("members").on("value",snap=>{if(snap.exists())setGroupMembers(snap.val());});
+      dbRef.child("swipes").on("value",snap=>{if(snap.exists())setGroupSwipes(snap.val());});
+      dbRef.child("times").on("value",snap=>{if(snap.exists())setGroupTimes(snap.val());});
+    } else {
+      // localStorage path — write initial state so other tabs can read it
+      localStorage.setItem(`resy-session-${code}`,JSON.stringify({
+        created:Date.now(),members:initialMembers,swipes:{[myId]:{}},times:{}
+      }));
+      attachStorageListener(code);
+    }
+  },[attachStorageListener,onGroupSession]);
+
+  const joinGroup=useCallback(async(code,name)=>{
+    setJoinPrompt(null);
+    const displayName=name||"Guest";
+    if(window.resyDB){
+      // Firebase path
+      const ref=window.resyDB.ref(`sessions/${code}`);
+      const snap=await ref.once("value");
+      if(!snap.exists())return;
+      await ref.child(`members/${myUID}`).set({joined:Date.now(),name:displayName});
+      await ref.child(`swipes/${myUID}`).set({});
+      groupDBRef.current=ref;
+      setGroupSession({code,myId:myUID});
+      onGroupSession&&onGroupSession(code);
+      ref.child("members").on("value",s=>{if(s.exists())setGroupMembers(s.val());});
+      ref.child("swipes").on("value",s=>{if(s.exists())setGroupSwipes(s.val());});
+      ref.child("times").on("value",s=>{if(s.exists())setGroupTimes(s.val());});
+    } else {
+      // localStorage path
+      const key=`resy-session-${code}`;
+      let session;
+      try{ session=JSON.parse(localStorage.getItem(key)||"{}"); }catch(_){ session={}; }
+      if(!session.created){
+        session={created:Date.now(),members:{},swipes:{},times:{}};
+      }
+      const members={...session.members,[myUID]:{joined:Date.now(),name:displayName}};
+      const swipes={...session.swipes,[myUID]:session.swipes?.[myUID]||{}};
+      localStorage.setItem(key,JSON.stringify({...session,members,swipes}));
+      setGroupSession({code,myId:myUID});
+      onGroupSession&&onGroupSession(code);
+      setGroupMembers(members);
+      setGroupSwipes(swipes);
+      attachStorageListener(code);
+    }
+  },[myUID,attachStorageListener,onGroupSession]);
+
+  const leaveGroup=useCallback(()=>{
+    if(groupDBRef.current){groupDBRef.current.child("members").off();groupDBRef.current.child("swipes").off();}
+    groupDBRef.current=null;
+    if(storageLstnRef.current){window.removeEventListener("storage",storageLstnRef.current);storageLstnRef.current=null;}
+    setGroupSession(null);setGroupMembers({});setGroupSwipes({});setGroupTimes({});
+    setShowGroupResults(false);setPendingTimeR(null);
+    onGroupSession&&onGroupSession(null);
+  },[]);
+
+  const handleDone=p=>{setPrefs(p);setShowOnboard(false);};
+  const applyAndClose=f=>{setFilters(f);setShowFilter(false);};
+
+  const recordGroupSwipe=useCallback((r,time)=>{
+    // Update local swipe state
+    setGroupSwipes(prev=>({...prev,[groupSession.myId]:{...(prev[groupSession.myId]||{}),[r.id]:"right"}}));
+    // Update local time state
+    if(time) setGroupTimes(prev=>({...prev,[groupSession.myId]:{...(prev[groupSession.myId]||{}),[r.id]:time}}));
+    // Persist
+    if(groupDBRef.current){
+      groupDBRef.current.child(`swipes/${groupSession.myId}/${r.id}`).set("right");
+      if(time) groupDBRef.current.child(`times/${groupSession.myId}/${r.id}`).set(time);
+    } else {
+      try{
+        const key=`resy-session-${groupSession.code}`;
+        const s=JSON.parse(localStorage.getItem(key)||"{}");
+        s.swipes=s.swipes||{};s.swipes[groupSession.myId]=s.swipes[groupSession.myId]||{};
+        s.swipes[groupSession.myId][r.id]="right";
+        if(time){s.times=s.times||{};s.times[groupSession.myId]=s.times[groupSession.myId]||{};s.times[groupSession.myId][r.id]=time;}
+        localStorage.setItem(key,JSON.stringify(s));
+      }catch(_){}
+    }
+  },[groupSession]);
+
+  const onSwipe=useCallback((dir,r)=>{
+    if(dir==="notify"){setNotifyR(r);setIdx(i=>i+1);setTimeout(()=>setNotifyR(null),2800);return;}
+    setIdx(i=>i+1);
+    if(groupSession){
+      if(dir==="right"){
+        // Show time picker; swipe recorded after user picks a time
+        const availTimes=(r.times.length>0?r.times:r.gdaTimes);
+        if(availTimes.length>0){setPendingTimeR(r);return;}
+        recordGroupSwipe(r,null);
+      } else {
+        // Left swipe — record immediately
+        setGroupSwipes(prev=>({...prev,[groupSession.myId]:{...(prev[groupSession.myId]||{}),[r.id]:"left"}}));
+        if(groupDBRef.current){groupDBRef.current.child(`swipes/${groupSession.myId}/${r.id}`).set("left");}
+        else{try{const key=`resy-session-${groupSession.code}`;const s=JSON.parse(localStorage.getItem(key)||"{}");s.swipes=s.swipes||{};s.swipes[groupSession.myId]=s.swipes[groupSession.myId]||{};s.swipes[groupSession.myId][r.id]="left";localStorage.setItem(key,JSON.stringify(s));}catch(_){}}
+      }
+      return;
+    }
+    if(dir==="right"){
+      if(r.notifyOnly&&!amexLinked){setNotifyR(r);setTimeout(()=>setNotifyR(null),2800);setShowAmexPromo(true);}
+      else{const t=(r.notifyOnly?r.gdaTimes:r.times)[0];setMatch(r);setMatchTime(t);}
+    }
+  },[amexLinked,groupSession,recordGroupSwipe]);
+
+  const fire=dir=>{setTrigger(dir);setTimeout(()=>setTrigger(null),80);};
+  const onTime=useCallback((r,t)=>{setMatch(r);setMatchTime(t);},[]);
+  const memberCount=Object.keys(groupMembers).length;
+
+  return(
+    <div style={{height:"100%",background:"#F5F4F0",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden"}}>
+
+      {/* ── Minimal context bar ── */}
+      <div style={{padding:"8px 14px 6px",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <Svg d={I.mapPin} size={11} stroke="#BBBBBB" sw={1.5}/>
+          <span style={{fontSize:12,color:"#AAAAAA",fontWeight:500}}>Q Center, St. Charles</span>
+          {prefs?.amexTier&&prefs.amexTier!=="skip"?(
+            <button onClick={()=>setShowAmexPromo(true)} style={{display:"flex",alignItems:"center",gap:3,background:"#FFF5F4",borderRadius:5,padding:"2px 7px",border:"1px solid #FFE0DC",cursor:"pointer"}}>
+              <div style={{width:4,height:4,borderRadius:"50%",background:"#FF4438"}}/>
+              <span style={{fontSize:9,fontWeight:800,color:"#FF4438",letterSpacing:"0.4px"}}>AMEX</span>
+            </button>
+          ):(
+            <button onClick={()=>setShowAmexPromo(true)} style={{display:"flex",alignItems:"center",gap:3,background:"#EEF4FF",borderRadius:5,padding:"2px 8px",border:"1px solid #C7DCFF",cursor:"pointer"}}>
+              <span style={{fontSize:9,fontWeight:800,color:"#006FCF",letterSpacing:"0.4px"}}>✦ Get Amex</span>
+            </button>
+          )}
+        </div>
+        <div style={{display:"flex",gap:7}}>
+          <button onClick={()=>setShowFilter(true)} style={{width:34,height:34,borderRadius:10,background:activeFilterCount>0?"#FF4438":"#FFF",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
+            <Svg d={I.sliders} size={14} stroke={activeFilterCount>0?"#FFF":"#666"} sw={1.75}/>
+            {activeFilterCount>0&&<span style={{position:"absolute",top:-5,right:-5,background:"#1A1A1A",color:"#FFF",borderRadius:99,fontSize:8,fontWeight:800,padding:"1px 5px",minWidth:16,textAlign:"center",lineHeight:"14px"}}>{activeFilterCount}</span>}
+          </button>
+          <button onClick={()=>setShowGroup(true)} style={{width:34,height:34,borderRadius:10,background:"#FFF",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
+            <Svg d={I.users} size={14} stroke="#666" sw={1.75}/>
+          </button>
+        </div>
+      </div>
+
+      {/* Active filter chips — compact scrollable row */}
+      {activeFilterCount>0&&(
+        <div style={{display:"flex",gap:5,overflowX:"auto",scrollbarWidth:"none",padding:"0 14px 6px",flexShrink:0}}>
+          {filters.groupSize&&(
+            <button onClick={()=>setFilters(f=>({...f,groupSize:null}))} style={{display:"flex",alignItems:"center",gap:3,padding:"3px 9px",borderRadius:99,background:"#1A1A1A",border:"none",color:"#FFF",fontSize:10,fontWeight:600,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+              {["Just Me","Couple","3–5","6–10","Party 10+"][["solo","couple","small","large","party"].indexOf(filters.groupSize)]}
+              <span style={{opacity:0.5,fontSize:9}}>×</span>
+            </button>
+          )}
+          {filters.ambiance.map(a=>(
+            <button key={a} onClick={()=>setFilters(f=>({...f,ambiance:f.ambiance.filter(x=>x!==a)}))} style={{display:"flex",alignItems:"center",gap:3,padding:"3px 9px",borderRadius:99,background:"#1A1A1A",border:"none",color:"#FFF",fontSize:10,fontWeight:600,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",textTransform:"capitalize"}}>
+              {a}<span style={{opacity:0.5,fontSize:9}}>×</span>
+            </button>
+          ))}
+          {filters.cuisine&&filters.cuisine!=="all"&&(
+            <button onClick={()=>setFilters(f=>({...f,cuisine:"all"}))} style={{display:"flex",alignItems:"center",gap:3,padding:"3px 9px",borderRadius:99,background:"#1A1A1A",border:"none",color:"#FFF",fontSize:10,fontWeight:600,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",textTransform:"capitalize"}}>
+              {filters.cuisine}<span style={{opacity:0.5,fontSize:9}}>×</span>
+            </button>
+          )}
+          {filters.price.map(p=>(
+            <button key={p} onClick={()=>setFilters(f=>({...f,price:f.price.filter(x=>x!==p)}))} style={{display:"flex",alignItems:"center",gap:3,padding:"3px 9px",borderRadius:99,background:"#1A1A1A",border:"none",color:"#FFF",fontSize:10,fontWeight:600,cursor:"pointer",flexShrink:0}}>
+              {p}<span style={{opacity:0.5,fontSize:9}}>×</span>
+            </button>
+          ))}
+          <button onClick={()=>setFilters(DEFAULT_FILTERS)} style={{display:"flex",alignItems:"center",padding:"3px 9px",borderRadius:99,background:"none",border:"1px solid #CCCCCC",color:"#AAAAAA",fontSize:10,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {remaining===0&&(
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,textAlign:"center"}}>
+          <div style={{width:56,height:56,borderRadius:"50%",background:"#EEECEA",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12}}>
+            <Svg d={I.compass} size={24} stroke="#CCCCCC"/>
+          </div>
+          <h2 style={{fontSize:18,fontWeight:700,color:"#1A1A1A",margin:"0 0 6px"}}>{activeFilterCount>0?"No matches":"All caught up"}</h2>
+          <p style={{color:"#AAAAAA",fontSize:13,lineHeight:1.6,margin:"0 0 20px"}}>{activeFilterCount>0?"Try adjusting your filters.":"Check back for new availability."}</p>
+          {activeFilterCount>0
+            ?<button onClick={()=>setFilters(DEFAULT_FILTERS)} style={{padding:"11px 26px",borderRadius:10,background:"#FF4438",border:"none",color:"#FFF",fontSize:14,fontWeight:700,cursor:"pointer"}}>Clear Filters</button>
+            :<button onClick={()=>setIdx(0)} style={{padding:"11px 26px",borderRadius:10,background:"#FF4438",border:"none",color:"#FFF",fontSize:14,fontWeight:700,cursor:"pointer"}}>Start Over</button>
+          }
+        </div>
+      )}
+
+      {/* Card stack — fills all remaining space, clipped so back-cards don't bleed */}
+      {remaining>0&&(
+        <div style={{flex:1,position:"relative",margin:"4px 10px 0",minHeight:0,overflow:"hidden",borderRadius:18}}>
+          {visible.map((r,i)=>(
+            <SwipeCard key={r.id} r={r} stackIndex={i}
+              onSwipe={onSwipe} triggerSwipe={i===0?trigger:null}
+              onTime={i===0?t=>onTime(r,t):null} amexLinked={amexLinked}
+              groupVotes={groupSession?groupVotes[r.id]||0:0} memberCount={memberCount}
+              onTap={i===0?()=>setDetailR(r):null}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Action row */}
+      {remaining>0&&(
+        <div style={{padding:"10px 0 14px",display:"flex",justifyContent:"center",gap:20,alignItems:"center",flexShrink:0}}>
+          <button onClick={()=>fire("left")} style={{width:48,height:48,borderRadius:"50%",background:"#FFF",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.10)"}}>
+            <Svg d={I.x} size={18} stroke="#FF4438" sw={2.5}/>
+          </button>
+          <button onClick={()=>fire("right")} style={{width:64,height:64,borderRadius:"50%",background:"#FF4438",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 24px rgba(255,68,56,0.36)"}}>
+            <Svg d={I.utensils} size={23} stroke="#FFF" sw={2.2}/>
+          </button>
+          <button style={{width:48,height:48,borderRadius:"50%",background:"#FFF",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.10)"}}>
+            <Svg d={I.bookmark} size={16} stroke="#AAAAAA" sw={1.75}/>
+          </button>
+        </div>
+      )}
+
+      {/* Group status bar — shown when in a session */}
+      {groupSession&&(
+        <div style={{background:"#1C1C1E",padding:"6px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0,flex:1}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:"#22C55E",boxShadow:"0 0 0 2px rgba(34,197,94,0.3)",flexShrink:0}}/>
+            <span style={{fontSize:11,fontWeight:700,color:"#FFF",letterSpacing:"0.2px",flexShrink:0}}>{groupSession.code}</span>
+            <span style={{fontSize:11,color:"rgba(255,255,255,0.38)",flexShrink:0}}>· {memberCount}p</span>
+            {topPick&&(
+              <span style={{fontSize:11,color:"rgba(255,255,255,0.55)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                · 🏆 <span style={{color:"#FF6B61"}}>{topPick.name}</span> {topPick.votes}/{memberCount}
+              </span>
+            )}
+          </div>
+          <div style={{display:"flex",gap:8,flexShrink:0}}>
+            <button onClick={()=>setShowGroupResults(true)}
+              style={{background:"#FF4438",border:"none",color:"#FFF",fontSize:11,fontWeight:700,cursor:"pointer",padding:"4px 9px",borderRadius:6}}>
+              Results
+            </button>
+            <button onClick={leaveGroup} style={{background:"none",border:"none",color:"rgba(255,255,255,0.35)",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Leave</button>
+          </div>
+        </div>
+      )}
+
+      {notifyR&&<NotifyToast r={notifyR} priority={amexLinked}/>}
+      {match&&<MatchScreen r={match} time={matchTime} amexLinked={amexLinked} onBack={()=>setMatch(null)} onBookingConfirmed={onBookingConfirmed} goToReservations={goToReservations}/>}
+      {showOnboard&&<OnboardingModal onDone={handleDone}/>}
+      {showGroup&&<GroupOverlay onClose={()=>setShowGroup(false)} onSessionStart={handleSessionStart}/>}
+      {showFilter&&<FilterSheet filters={filters} onApply={applyAndClose} onClose={()=>setShowFilter(false)}/>}
+      {showAmexPromo&&<AmexPromoSheet onClose={()=>setShowAmexPromo(false)}/>}
+      {detailR&&<RestaurantDetailSheet r={detailR} amexLinked={amexLinked}
+        onClose={()=>setDetailR(null)}
+        onReserve={(r,t)=>{setDetailR(null);setMatch(r);setMatchTime(t);}}
+      />}
+
+      {/* Join prompt — triggered by ?group=CODE in URL */}
+      {joinPrompt&&(
+        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)",zIndex:112,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={()=>setJoinPrompt(null)}>
+          <div className="slide-up" style={{background:"#FFF",borderRadius:"22px 22px 0 0",padding:"24px 20px 40px"}} onClick={e=>e.stopPropagation()}>
+            <div style={{width:36,height:4,background:"#E8E8E8",borderRadius:2,margin:"0 auto 18px"}}/>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <div style={{width:40,height:40,borderRadius:"50%",background:"#FF4438",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Svg d={I.users} size={18} stroke="#FFF" sw={2}/>
+              </div>
+              <div>
+                <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",color:"#AAAAAA",margin:"0 0 2px"}}>Group Invite</p>
+                <h2 style={{fontSize:18,fontWeight:800,color:"#1A1A1A",margin:0}}>Join {joinPrompt}?</h2>
+              </div>
+            </div>
+            <p style={{color:"#AAAAAA",fontSize:13,lineHeight:1.55,margin:"0 0 14px"}}>
+              Swipe right to vote. Tap Results in the group bar to see the leaderboard.
+            </p>
+            <input
+              value={joinName}
+              onChange={e=>setJoinName(e.target.value)}
+              placeholder="Your name"
+              maxLength={24}
+              style={{width:"100%",padding:"12px 14px",borderRadius:10,border:"1.5px solid #EEEEEE",fontSize:14,color:"#1A1A1A",outline:"none",background:"#FAFAFA",boxSizing:"border-box",marginBottom:12}}
+            />
+            <button onClick={()=>joinGroup(joinPrompt,joinName||"Guest")} style={{width:"100%",padding:14,borderRadius:12,background:"#FF4438",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:10}}>
+              Join Group
+            </button>
+            <button onClick={()=>setJoinPrompt(null)} style={{width:"100%",padding:12,borderRadius:12,background:"#FFF",border:"1.5px solid #EEEEEE",color:"#777",fontSize:14,cursor:"pointer"}}>
+              Swipe Alone
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Group results — ranked by vote count */}
+      {pendingTimeR&&(
+        <TimePickerSheet r={pendingTimeR} onSelect={time=>{recordGroupSwipe(pendingTimeR,time);setPendingTimeR(null);}}/>
+      )}
+      {showGroupResults&&(
+        <GroupResultsOverlay
+          ranked={sortedByVotes}
+          memberCount={memberCount}
+          groupMembers={groupMembers}
+          groupSwipes={groupSwipes}
+          groupTimes={groupTimes}
+          onBook={r=>{setMatch(r);setMatchTime((r.notifyOnly?r.gdaTimes:r.times)[0]);setShowGroupResults(false);}}
+          onClose={()=>setShowGroupResults(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── BROWSE CARD ── */
+const BrowseCard=({r,horiz,onBook})=>horiz?(
+  <div onClick={onBook} style={{width:155,flexShrink:0,cursor:"pointer"}}>
+    <div style={{borderRadius:12,overflow:"hidden",height:104,marginBottom:8,position:"relative"}}>
+      <RestaurantImg r={r}/>
+    </div>
+    <p style={{fontSize:13,fontWeight:700,color:"#1A1A1A",margin:"0 0 2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</p>
+    <p style={{fontSize:11,color:"#AAAAAA",margin:"0 0 6px"}}>{r.cuisine} · {r.price}</p>
+    <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+      {(r.times.length?r.times:r.gdaTimes).slice(0,2).map(t=><TimePill key={t} t={t}/>)}
+      {r.notifyOnly&&!r.times.length&&<span style={{fontSize:11,color:"#C8C8C8",padding:"5px 0"}}>Fully booked</span>}
+    </div>
+  </div>
+):(
+  <div style={{display:"flex",gap:12,padding:"13px 0",borderBottom:"1px solid #F5F5F5",cursor:"pointer"}}>
+    <div style={{width:74,height:74,borderRadius:11,overflow:"hidden",flexShrink:0,position:"relative"}}>
+      <RestaurantImg r={r}/>
+      {r.notifyOnly&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.28)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#FFF",fontSize:7,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Full</span></div>}
+    </div>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:2}}>
+        <p style={{fontSize:15,fontWeight:700,color:"#1A1A1A",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,marginRight:8}}>{r.name}</p>
+        <Stars n={r.rating} sz={10}/>
+      </div>
+      <p style={{fontSize:12,color:"#AAAAAA",margin:"0 0 7px"}}>{r.cuisine} · {r.hood} · {r.price}</p>
+      <div style={{display:"flex",gap:5,alignItems:"center"}}>
+        {r.notifyOnly
+          ?<button style={{padding:"4px 10px",borderRadius:7,border:"1.5px solid #FF4438",background:"none",color:"#FF4438",fontSize:11,fontWeight:600,cursor:"pointer"}}>Notify Me</button>
+          :r.times.slice(0,3).map(t=><TimePill key={t} t={t}/>)
+        }
+      </div>
+    </div>
+  </div>
+);
+
+/* ── MAP VIEW ── */
+function MapView({onSelect}){
+  const ref=useRef(null);
+  useEffect(()=>{
+    if(!ref.current)return;
+    const map=L.map(ref.current,{zoomControl:false}).setView(Q_CENTER,13);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{
+      attribution:'© OpenStreetMap © CartoDB',maxZoom:19
+    }).addTo(map);
+    L.control.zoom({position:"bottomright"}).addTo(map);
+
+    // Q Center pin
+    const youIcon=L.divIcon({html:`<div style="width:14px;height:14px;border-radius:50%;background:#1C1C1E;border:3px solid #FFF;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>`,iconSize:[14,14],className:""});
+    L.marker(Q_CENTER,{icon:youIcon}).addTo(map).bindPopup(`<div style="font-family:-apple-system,sans-serif;font-size:12px;font-weight:700">Q Center</div>`);
+
+    // Restaurant markers
+    RESTAURANTS.forEach(r=>{
+      const coords=COORDS[r.id];
+      if(!coords)return;
+      const open=!r.notifyOnly||r.gdaTimes.length>0;
+      const times=(r.notifyOnly?r.gdaTimes:r.times).slice(0,3);
+      const icon=L.divIcon({
+        html:`<div style="width:36px;height:36px;border-radius:50%;background:${open?"#FF4438":"#AAAAAA"};border:3px solid #FFF;box-shadow:0 3px 10px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.2" stroke-linecap="round">
+            <path d="M3 2v7c0 1.1.9 2 2 2h4v13"/><path d="M17 2v20"/><path d="M12 2v7c0 1.1-.9 2-2 2"/>
+          </svg>
+        </div>`,
+        iconSize:[36,36],iconAnchor:[18,18],className:""
+      });
+      const timesHtml=times.length
+        ?times.map(t=>`<span style="background:#FF4438;color:#fff;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;margin-right:4px">${t}</span>`).join("")
+        :`<span style="color:#AAAAAA;font-size:11px">${r.notifyOnly?"GDA only":"Fully booked"}</span>`;
+      const m=L.marker(coords,{icon}).addTo(map);
+      m.bindPopup(`
+        <div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;width:180px">
+          <p style="margin:0 0 2px;font-size:14px;font-weight:800;color:#1A1A1A">${r.name}</p>
+          <p style="margin:0 0 8px;font-size:11px;color:#999">${r.cuisine} · ${r.hood} · ${r.price}</p>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">${timesHtml}</div>
+          <button onclick="window._resySelect(${r.id})" style="width:100%;padding:8px;background:#FF4438;color:#FFF;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Reserve</button>
+        </div>`,{maxWidth:200,className:"resy-popup"});
+    });
+
+    // Fit all points
+    const allPts=[Q_CENTER,...RESTAURANTS.map(r=>COORDS[r.id]).filter(Boolean)];
+    map.fitBounds(allPts,{padding:[28,28]});
+
+    window._resySelect=id=>{const r=RESTAURANTS.find(x=>x.id===id);if(r&&onSelect)onSelect(r);map.closePopup();};
+    return()=>{delete window._resySelect;map.remove();};
+  },[]);
+  return<div ref={ref} style={{width:"100%",height:"100%"}}/>;
+}
+
+/* ── RESTAURANTS SCREEN ── */
+function RestaurantsScreen(){
+  const[q,setQ]=useState("");
+  const[view,setView]=useState("list");
+  const[mapSelect,setMapSelect]=useState(null);
+  const past=RESTAURANTS.filter(r=>r.past).slice(0,4);
+  const filtered=q?RESTAURANTS.filter(r=>[r.name,r.cuisine,r.hood].some(s=>s.toLowerCase().includes(q.toLowerCase()))):RESTAURANTS;
+  return(
+    <div style={{height:"100%",background:"#FFF",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{padding:"10px 16px 0",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <h1 style={{fontSize:20,fontWeight:800,color:"#1A1A1A",margin:0,letterSpacing:"-0.5px"}}>Restaurants</h1>
+          {/* List / Map toggle */}
+          <div style={{display:"flex",background:"#F2F2F2",borderRadius:9,padding:3,gap:2}}>
+            {[["list","List",I.search],["map","Map",I.mapPin]].map(([id,label,icon])=>(
+              <button key={id} onClick={()=>setView(id)}
+                style={{padding:"5px 11px",borderRadius:7,border:"none",background:view===id?"#FFF":"transparent",color:view===id?"#1A1A1A":"#999",fontSize:12,fontWeight:view===id?700:400,cursor:"pointer",display:"flex",alignItems:"center",gap:4,boxShadow:view===id?"0 1px 4px rgba(0,0,0,0.10)":"none",transition:"all 0.15s"}}>
+                <Svg d={icon} size={11} stroke={view===id?"#1A1A1A":"#AAAAAA"}/>{label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {view==="list"&&<div style={{position:"relative",marginBottom:8}}>
+          <div style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}><Svg d={I.search} size={13} stroke="#BBBBBB"/></div>
+          <input type="text" value={q} onChange={e=>setQ(e.target.value)} placeholder="Restaurant, cuisine, neighborhood..."
+            style={{width:"100%",padding:"9px 12px 9px 31px",borderRadius:10,border:"1.5px solid #EEEEEE",background:"#F7F7F7",fontSize:13,color:"#1A1A1A",outline:"none"}}/>
+          {q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:2}}><Svg d={I.x} size={13} stroke="#BBBBBB"/></button>}
+        </div>}
+      </div>
+
+      {/* Map view */}
+      {view==="map"&&(
+        <div style={{flex:1,position:"relative"}}>
+          <MapView onSelect={r=>{setMapSelect(r);}}/>
+          {/* Map legend */}
+          <div style={{position:"absolute",top:10,left:10,background:"rgba(255,255,255,0.94)",backdropFilter:"blur(8px)",borderRadius:10,padding:"8px 11px",boxShadow:"0 2px 12px rgba(0,0,0,0.10)",zIndex:500}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:"#FF4438",flexShrink:0}}/>
+              <span style={{fontSize:11,color:"#555",fontWeight:500}}>Available tonight</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:"#AAAAAA",flexShrink:0}}/>
+              <span style={{fontSize:11,color:"#555",fontWeight:500}}>Fully booked</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:"#1C1C1E",flexShrink:0}}/>
+              <span style={{fontSize:11,color:"#555",fontWeight:500}}>Q Center (you)</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* List view */}
+      {view==="list"&&<div style={{flex:1,overflowY:"auto",padding:"0 16px 80px"}}>
+        {!q&&<>
+          <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1.2px",color:"#AAAAAA",margin:"4px 0 10px"}}>Book Again</p>
+          <div style={{display:"flex",gap:12,overflowX:"auto",scrollbarWidth:"none",marginBottom:18,paddingBottom:4}}>
+            {past.map(r=><BrowseCard key={r.id} r={r} horiz/>)}
+          </div>
+          <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"1.2px",color:"#AAAAAA",margin:"0 0 2px"}}>Near Q Center · St. Charles</p>
+        </>}
+        {filtered.map(r=><BrowseCard key={r.id} r={r}/>)}
+      </div>}
+
+      {/* Bottom sheet when a map pin is tapped */}
+      {mapSelect&&(
+        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.32)",zIndex:600,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={()=>setMapSelect(null)}>
+          <div className="slide-up" style={{background:"#FFF",borderRadius:"20px 20px 0 0",padding:"18px 20px 40px"}} onClick={e=>e.stopPropagation()}>
+            <div style={{width:36,height:4,background:"#E0E0E0",borderRadius:2,margin:"0 auto 16px"}}/>
+            <div style={{display:"flex",gap:12,marginBottom:14}}>
+              <div style={{width:70,height:70,borderRadius:12,overflow:"hidden",flexShrink:0}}><RestaurantImg r={mapSelect}/></div>
+              <div>
+                <p style={{fontSize:16,fontWeight:800,color:"#1A1A1A",margin:"0 0 2px"}}>{mapSelect.name}</p>
+                <p style={{fontSize:12,color:"#AAAAAA",margin:"0 0 5px"}}>{mapSelect.cuisine} · {mapSelect.hood}</p>
+                <Stars n={mapSelect.rating}/>&nbsp;<span style={{fontSize:12,color:"#AAAAAA"}}>· {mapSelect.price} · {mapSelect.dist}</span>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:5,marginBottom:14,flexWrap:"wrap"}}>
+              {(mapSelect.notifyOnly?mapSelect.gdaTimes:mapSelect.times).slice(0,4).map(t=><TimePill key={t} t={t}/>)}
+              {mapSelect.notifyOnly&&!mapSelect.gdaTimes.length&&<span style={{fontSize:12,color:"#C0C0C0"}}>Fully booked tonight</span>}
+            </div>
+            <button style={{width:"100%",padding:13,borderRadius:11,background:"#FF4438",border:"none",color:"#FFF",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setMapSelect(null)}>
+              Reserve at {mapSelect.name}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── RESERVATIONS SCREEN ── */
+function ReservationsScreen({onDiscover,dynamicBookings}){
+  const[tab,setTab]=useState("upcoming");
+  const staticUpcoming=RESTAURANTS.filter(r=>r.upcoming);
+  const allUpcoming=[...(dynamicBookings||[]).map(b=>({...b.r,_dynamic:true,_booking:b})),...staticUpcoming];
+  const past=RESTAURANTS.filter(r=>r.past).slice(0,4);
+  return(
+    <div style={{height:"100%",background:"#FFF",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{padding:"14px 16px 0",flexShrink:0}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:"#1A1A1A",margin:"0 0 14px",letterSpacing:"-0.5px"}}>Reservations</h1>
+        <div style={{display:"flex",borderBottom:"1.5px solid #F0F0F0"}}>
+          {["upcoming","past"].map(t=>(
+            <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:`2px solid ${tab===t?"#FF4438":"transparent"}`,marginBottom:-2,color:tab===t?"#FF4438":"#AAAAAA",fontSize:14,fontWeight:tab===t?700:400,cursor:"pointer",textTransform:"capitalize",transition:"all 0.14s"}}>{t}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"16px 16px 80px"}}>
+        {tab==="upcoming"&&(allUpcoming.length===0?(
+          <div style={{textAlign:"center",padding:"56px 0"}}>
+            <div style={{width:60,height:60,borderRadius:"50%",background:"#F7F5F0",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}><Svg d={I.calendar} size={26} stroke="#CCCCCC"/></div>
+            <h2 style={{fontSize:18,fontWeight:700,color:"#1A1A1A",margin:"0 0 7px"}}>Nothing booked yet</h2>
+            <p style={{color:"#AAAAAA",fontSize:14,lineHeight:1.6,margin:"0 0 22px"}}>Time to discover somewhere new.</p>
+            <button onClick={onDiscover} style={{padding:"12px 26px",borderRadius:11,background:"#FF4438",border:"none",color:"#FFF",fontSize:14,fontWeight:700,cursor:"pointer"}}>Discover Restaurants</button>
+          </div>
+        ):allUpcoming.map((r,i)=>{
+          const bk=r._booking;
+          return(
+            <div key={i} style={{borderRadius:14,border:"1px solid #F0F0F0",padding:15,marginBottom:12,overflow:"hidden"}}>
+              {r._dynamic&&<div style={{display:"flex",alignItems:"center",gap:5,marginBottom:9}}>
+                <div style={{width:5,height:5,borderRadius:"50%",background:"#22C55E"}}/>
+                <span style={{fontSize:10,fontWeight:700,color:"#22C55E",letterSpacing:"0.3px"}}>Just Confirmed · {bk.code}</span>
+              </div>}
+              <div style={{display:"flex",gap:11,marginBottom:11}}>
+                <div style={{width:60,height:60,borderRadius:10,overflow:"hidden",flexShrink:0}}><RestaurantImg r={r}/></div>
+                <div>
+                  <p style={{fontSize:15,fontWeight:700,color:"#1A1A1A",margin:"0 0 2px"}}>{r.name}</p>
+                  <p style={{fontSize:12,color:"#AAAAAA",margin:"0 0 3px"}}>{r.cuisine} · {r.hood}</p>
+                  <p style={{fontSize:12,fontWeight:600,color:"#555",margin:0}}>{r._dynamic?`${bk.date} · ${bk.time} · ${bk.party} guest${bk.party!==1?"s":""}`:`Fri, Aug 8 · ${r.times[0]||r.gdaTimes[0]} · 2 guests`}</p>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:9}}>
+                <button style={{flex:1,padding:9,borderRadius:9,background:"#F7F7F7",border:"none",color:"#1A1A1A",fontSize:13,fontWeight:600,cursor:"pointer"}}>Modify</button>
+                <button style={{flex:1,padding:9,borderRadius:9,background:"#FFF",border:"1px solid #EEEEEE",color:"#AAAAAA",fontSize:13,cursor:"pointer"}}>Cancel</button>
+              </div>
+            </div>
+          );
+        }))}
+        {tab==="past"&&past.map(r=>(
+          <div key={r.id} style={{display:"flex",alignItems:"center",gap:11,padding:"12px 0",borderBottom:"1px solid #F5F5F5"}}>
+            <div style={{width:46,height:46,borderRadius:9,overflow:"hidden",flexShrink:0}}><RestaurantImg r={r}/></div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:14,fontWeight:600,color:"#1A1A1A",margin:"0 0 2px"}}>{r.name}</p>
+              <p style={{fontSize:11,color:"#AAAAAA",margin:0}}>{r.cuisine} · {r.hood}</p>
+            </div>
+            <button style={{padding:"6px 12px",borderRadius:8,border:"1.5px solid #FF4438",background:"none",color:"#FF4438",fontSize:12,fontWeight:600,cursor:"pointer",flexShrink:0}}>Book Again</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── PROFILE SCREEN ── */
+function ProfileScreen(){
+  const rows=[
+    {icon:I.bookmark,label:"Saved Restaurants",note:"8"},
+    {icon:I.star,label:"Dining Preferences"},
+    {icon:I.card,label:"Payment Methods"},
+    {icon:I.bell,label:"Notifications"},
+    {icon:I.help,label:"Help & Support"},
+    {icon:I.settings,label:"Account Settings"},
+  ];
+  return(
+    <div style={{height:"100%",background:"#FFF",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{flex:1,overflowY:"auto",padding:"14px 0 80px"}}>
+        <div style={{padding:"4px 16px 20px",borderBottom:"1px solid #F5F5F5",marginBottom:6}}>
+          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+            <div style={{width:62,height:62,borderRadius:"50%",background:"#FF4438",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <span style={{color:"#FFF",fontSize:20,fontWeight:800}}>JD</span>
+            </div>
+            <div>
+              <p style={{fontSize:18,fontWeight:800,color:"#1A1A1A",margin:"0 0 2px"}}>Jane Doe</p>
+              <p style={{fontSize:12,color:"#AAAAAA",margin:"0 0 7px"}}>Member since January 2021</p>
+              <div style={{display:"flex",gap:6}}>
+                <span style={{background:"#FF4438",color:"#FFF",fontSize:9,fontWeight:800,padding:"3px 8px",borderRadius:4,letterSpacing:"0.6px"}}>RESY BLACK</span>
+                <span style={{background:"#1C1C1E",color:"#FFF",fontSize:9,fontWeight:800,padding:"3px 8px",borderRadius:4,letterSpacing:"0.6px"}}>AMEX ★ PLATINUM</span>
+              </div>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:1,background:"#F0F0F0",borderRadius:12,overflow:"hidden"}}>
+            {[["47","Reservations"],["31","Restaurants"],["4","Cities"]].map(([n,l])=>(
+              <div key={l} style={{background:"#F9F9F9",padding:"12px 6px",textAlign:"center"}}>
+                <p style={{fontSize:19,fontWeight:800,color:"#1A1A1A",margin:"0 0 2px"}}>{n}</p>
+                <p style={{fontSize:9,color:"#AAAAAA",margin:0,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.5px"}}>{l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{margin:"6px 16px 12px",background:"#FFF5F4",border:"1px solid #FFE0DC",borderRadius:11,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <p style={{fontSize:12,fontWeight:700,color:"#FF4438",margin:"0 0 2px"}}>Global Dining Access · Active</p>
+            <p style={{fontSize:11,color:"#AAAAAA",margin:0}}>Priority Notify · Exclusive availability · $100/quarter</p>
+          </div>
+          <Svg d={I.star} size={17} stroke="#FF4438" fill="#FF4438" sw={0}/>
+        </div>
+        {rows.map((s,i)=>(
+          <button key={i} style={{width:"100%",display:"flex",alignItems:"center",gap:13,padding:"13px 16px",background:"none",border:"none",borderBottom:"1px solid #F5F5F5",cursor:"pointer",textAlign:"left"}}>
+            <div style={{width:34,height:34,borderRadius:8,background:"#F7F7F7",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <Svg d={s.icon} size={16} stroke="#555" sw={1.75}/>
+            </div>
+            <span style={{flex:1,fontSize:15,color:"#1A1A1A",fontWeight:500}}>{s.label}</span>
+            {s.note&&<span style={{fontSize:13,color:"#AAAAAA",marginRight:4}}>{s.note}</span>}
+            <Svg d={I.chevR} size={17} stroke="#DDDDDD" sw={1.5}/>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── BOTTOM NAV ── */
+function BottomNav({tab,setTab}){
+  const wide=window.innerWidth>430;
+  const tabs=[
+    {id:"discover",label:"Discover",icon:I.compass},
+    {id:"restaurants",label:"Browse",icon:I.search},
+    {id:"reservations",label:"Reservations",icon:I.calendar},
+    {id:"profile",label:"Profile",icon:I.user},
+  ];
+  return(
+    <div style={{background:"#FFF",borderTop:"1px solid #F0F0F0",display:"flex",
+      paddingBottom:wide?22:4,borderRadius:wide?"0 0 38px 38px":0,flexShrink:0,zIndex:50}}>
+      {tabs.map(t=>{
+        const a=tab===t.id;
+        return(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"10px 0 5px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:a?"#FF4438":"#BBBBBB",transition:"color 0.14s"}}>
+            <Svg d={t.icon} size={22} stroke={a?"#FF4438":"#BBBBBB"} sw={a?2:1.5}/>
+            <span style={{fontSize:"10px",fontWeight:a?700:400,letterSpacing:"0.1px"}}>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── APP ── */
+function App(){
+  const[tab,setTab]=useState("discover");
+  const[bookings,setBookings]=useState([]);
+  const[activeGroupCode,setActiveGroupCode]=useState(null);
+  const isWide=window.innerWidth>430;
+  const addBooking=useCallback(b=>setBookings(p=>[b,...p]),[]);
+  const goToReservations=useCallback(()=>setTab("reservations"),[]);
+  const groupUrl=activeGroupCode?`${window.location.origin}${window.location.pathname}?group=${activeGroupCode}`:null;
+  const qrSrc=activeGroupCode
+    ?`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(groupUrl)}&color=1A1A1A&bgcolor=FFFFFF`
+    :"QR Code.jpg";
+  return(
+    <div style={{minHeight:"100vh",background:"#EDEBE7",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+
+      {/* Phone mockup — no overflow:hidden so nav is never clipped */}
+      <div style={{width:isWide?390:"100%",maxWidth:390,height:"100vh",position:"relative",background:"#FFF",
+        boxShadow:isWide?"0 0 0 1px rgba(0,0,0,0.06),0 28px 72px rgba(0,0,0,0.20)":"none",
+        borderRadius:isWide?44:0,display:"flex",flexDirection:"column",flexShrink:0}}>
+
+        {/* Dynamic phone outline (replaces overflow:hidden for visual rounding) */}
+        {isWide&&<div style={{position:"absolute",inset:0,borderRadius:44,boxShadow:"inset 0 0 0 1px rgba(0,0,0,0.07)",pointerEvents:"none",zIndex:400}}/>}
+        {/* Notch */}
+        {isWide&&<div style={{position:"absolute",top:13,left:"50%",transform:"translateX(-50%)",width:100,height:22,background:"#1C1C1E",borderRadius:11,zIndex:401}}/>}
+
+        {/* App header */}
+        <div style={{padding:`${isWide?42:30}px 16px 9px`,background:"#FFF",flexShrink:0,
+          borderBottom:"1px solid #F5F5F5",zIndex:40,
+          borderRadius:isWide?"38px 38px 0 0":0}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontWeight:900,fontSize:24,letterSpacing:"-1.5px",color:"#FF4438"}}>resy</span>
+            <div style={{display:"flex",gap:4}}>
+              <button style={{background:"none",border:"none",cursor:"pointer",padding:6,borderRadius:8}}><Svg d={I.mapPin} size={19} stroke="#555" sw={1.75}/></button>
+              <button style={{background:"none",border:"none",cursor:"pointer",padding:6,borderRadius:8}}><Svg d={I.bell} size={19} stroke="#555" sw={1.75}/></button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab content — overflow:hidden here catches card swipes */}
+        <div style={{flex:1,position:"relative",overflow:"hidden"}}>
+          <div style={{display:tab==="discover"?"flex":"none",flexDirection:"column",height:"100%"}}><DiscoverScreen onBookingConfirmed={addBooking} goToReservations={goToReservations} onGroupSession={setActiveGroupCode}/></div>
+          <div style={{display:tab==="restaurants"?"flex":"none",flexDirection:"column",height:"100%"}}><RestaurantsScreen/></div>
+          <div style={{display:tab==="reservations"?"flex":"none",flexDirection:"column",height:"100%"}}><ReservationsScreen onDiscover={()=>setTab("discover")} dynamicBookings={bookings}/></div>
+          <div style={{display:tab==="profile"?"flex":"none",flexDirection:"column",height:"100%"}}><ProfileScreen/></div>
+        </div>
+
+        {/* Nav is a normal flex child — never clipped */}
+        <BottomNav tab={tab} setTab={setTab}/>
+      </div>
+
+      {/* QR code panel — right of phone, desktop only */}
+      {isWide&&(
+        <div style={{position:"absolute",left:"calc(50% + 222px)",top:"50%",transform:"translateY(-50%)",
+          display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
+          <div style={{background:"#FFF",borderRadius:20,padding:18,boxShadow:"0 8px 32px rgba(0,0,0,0.10)",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+            <img src={qrSrc} width={152} height={152} style={{display:"block",borderRadius:8}} alt="QR code"/>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+              <span style={{fontWeight:900,fontSize:17,letterSpacing:"-0.6px",color:"#FF4438"}}>resy</span>
+              {activeGroupCode
+                ?<><p style={{fontSize:11,color:"#22C55E",fontWeight:700,margin:0,textAlign:"center"}}>Group · {activeGroupCode}</p>
+                   <p style={{fontSize:10,color:"#AAAAAA",margin:0,textAlign:"center"}}>Scan to join the session</p></>
+                :<p style={{fontSize:11,color:"#AAAAAA",margin:0,textAlign:"center",lineHeight:1.6}}>Scan to open on your phone</p>}
+            </div>
+          </div>
+          <div style={{background:"rgba(255,255,255,0.7)",backdropFilter:"blur(8px)",borderRadius:12,padding:"8px 14px",border:"1px solid rgba(255,255,255,0.9)"}}>
+            <p style={{fontSize:10,color:"#AAAAAA",margin:0,textAlign:"center",letterSpacing:"0.3px"}}>St. Charles, IL · Live Demo</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
