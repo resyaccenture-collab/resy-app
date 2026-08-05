@@ -315,13 +315,98 @@ function NotifyToast({r,priority}){
   );
 }
 
+/* ── CARD BACK (flip-to-detail view, fits inside the card) ── */
+function CardBack({r,amexLinked,onFlipBack,onSwipeRight}){
+  const[data,setData]=useState(null);
+  const[loading,setLoading]=useState(true);
+  const[photoIdx,setPhotoIdx]=useState(0);
+  const effectiveTimes=r.notifyOnly?(amexLinked?r.gdaTimes:[]):r.times;
+  useEffect(()=>{
+    window._placeCache=window._placeCache||{};
+    if(window._placeCache[r.id]){setData(window._placeCache[r.id]);setLoading(false);return;}
+    fetch(`/api/place-details?name=${encodeURIComponent(r.name)}`)
+      .then(res=>res.ok?res.json():null)
+      .then(d=>{if(d){window._placeCache[r.id]=d;setData(d);}setLoading(false);})
+      .catch(()=>setLoading(false));
+  },[r.id,r.name]);
+  const photos=data?.photos||[];
+  const reviews=data?.reviews||[];
+  return(
+    <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
+      {/* Compact photo */}
+      <div style={{position:"relative",height:"40%",flexShrink:0,background:"#F0F0F0",overflow:"hidden"}}>
+        {photos.length>0
+          ?<img src={`/api/place-photo?ref=${encodeURIComponent(photos[photoIdx].ref)}`} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={r.name}/>
+          :<RestaurantImg r={r}/>}
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,0) 35%,rgba(0,0,0,0.60) 100%)"}}/>
+        {photos.length>1&&(
+          <div style={{position:"absolute",bottom:7,left:"50%",transform:"translateX(-50%)",display:"flex",gap:3}}>
+            {photos.slice(0,5).map((_,i)=>(
+              <div key={i} onClick={e=>{e.stopPropagation();setPhotoIdx(i);}}
+                style={{width:i===photoIdx?14:5,height:5,borderRadius:3,background:i===photoIdx?"#FFF":"rgba(255,255,255,0.45)",transition:"width 0.2s",cursor:"pointer"}}/>
+            ))}
+          </div>
+        )}
+        <button onClick={e=>{e.stopPropagation();onFlipBack();}}
+          style={{position:"absolute",top:9,right:9,width:26,height:26,borderRadius:"50%",background:"rgba(0,0,0,0.45)",border:"none",color:"#FFF",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)",zIndex:2,lineHeight:1}}>×</button>
+        <div style={{position:"absolute",bottom:12,left:12,right:38}}>
+          <p style={{color:"#FFF",fontSize:14,fontWeight:800,margin:"0 0 3px",letterSpacing:"-0.3px",textShadow:"0 1px 6px rgba(0,0,0,0.4)"}}>{r.name}</p>
+          {data?.rating&&<span style={{display:"inline-flex",alignItems:"center",gap:3,background:"rgba(0,0,0,0.32)",borderRadius:5,padding:"2px 6px",backdropFilter:"blur(4px)"}}>
+            <span style={{color:"#FFB800",fontSize:10}}>★</span>
+            <span style={{color:"#FFF",fontSize:11,fontWeight:700}}>{data.rating.toFixed(1)}</span>
+            <span style={{color:"rgba(255,255,255,0.62)",fontSize:10}}>({data.reviewCount?.toLocaleString()})</span>
+          </span>}
+        </div>
+        {loading&&<div style={{position:"absolute",inset:0,background:"rgba(255,255,255,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}><div className="spinner" style={{borderTopColor:"#FF4438"}}/></div>}
+      </div>
+      {/* Scrollable info */}
+      <div onClick={e=>e.stopPropagation()} style={{flex:1,overflowY:"auto",padding:"9px 13px 4px"}}>
+        {data&&<div style={{display:"flex",alignItems:"center",gap:5,marginBottom:7}}>
+          <div style={{width:7,height:7,borderRadius:"50%",background:data.isOpen?"#22C55E":"#EF4444",flexShrink:0}}/>
+          <span style={{fontSize:11,fontWeight:700,color:data.isOpen?"#22C55E":"#EF4444"}}>{data.isOpen===null?"Hours unknown":data.isOpen?"Open now":"Closed"}</span>
+          {data.address&&<><span style={{color:"#DDD",fontSize:10}}>·</span><span style={{fontSize:11,color:"#AAA",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0}}>{data.address.split(',')[0]}</span></>}
+        </div>}
+        {!data&&loading&&<div style={{height:18,background:"#F3F3F3",borderRadius:6,marginBottom:7,width:"65%"}}/>}
+        {data?.summary&&<p style={{fontSize:11,color:"#888",margin:"0 0 8px",lineHeight:1.55,fontStyle:"italic",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>"{data.summary}"</p>}
+        {reviews.length>0&&<>
+          <p style={{fontSize:9,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.2px",color:"#C0C0C0",margin:"0 0 6px"}}>What people say</p>
+          {reviews.slice(0,2).map((rev,i)=>(
+            <div key={i} style={{marginBottom:7,paddingBottom:7,borderBottom:i===0?"1px solid #F5F5F5":"none"}}>
+              <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
+                <div style={{width:20,height:20,borderRadius:"50%",background:"#1C1C1E",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <span style={{color:"#FFF",fontSize:9,fontWeight:700}}>{(rev.author||"?")[0].toUpperCase()}</span>
+                </div>
+                <span style={{fontSize:11,fontWeight:600,color:"#333"}}>{rev.author}</span>
+                <span style={{color:"#FFB800",fontSize:10,marginLeft:"auto"}}>{'★'.repeat(Math.round(rev.rating))}</span>
+              </div>
+              <p style={{fontSize:11,color:"#666",margin:0,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{rev.text}</p>
+            </div>
+          ))}
+        </>}
+        {loading&&!data&&<div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {[0,1].map(i=><div key={i} style={{height:44,background:"#F5F5F5",borderRadius:8}}/>)}
+        </div>}
+      </div>
+      {/* Reserve / back */}
+      <div onClick={e=>e.stopPropagation()} style={{padding:"7px 12px 12px",flexShrink:0,borderTop:"1px solid #F3F3F3"}}>
+        {effectiveTimes.length>0
+          ?<button onClick={()=>onSwipeRight()} style={{width:"100%",padding:"10px",borderRadius:10,background:"#FF4438",border:"none",color:"#FFF",fontSize:13,fontWeight:700,cursor:"pointer"}}>Reserve · {effectiveTimes[0]}</button>
+          :<button onClick={e=>{e.stopPropagation();onFlipBack();}} style={{width:"100%",padding:"9px",borderRadius:10,background:"none",border:"1.5px solid #EEE",color:"#AAA",fontSize:12,cursor:"pointer"}}>Back to swiping ↩</button>
+        }
+      </div>
+    </div>
+  );
+}
+
 /* ── SWIPE CARD ── */
-function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVotes=0,memberCount=0,onTap}){
+function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVotes=0,memberCount=0}){
   const[dx,setDx]=useState(0);
   const[flyDir,setFlyDir]=useState(null);
   const dragging=useRef(false);
   const sx=useRef(0),sy=useRef(0),ldx=useRef(0),ldy=useRef(0);
   const isTop=stackIndex===0;
+  const[flipped,setFlipped]=useState(false);
+  const[flipping,setFlipping]=useState(false);
 
   const effectiveTimes=r.notifyOnly?(amexLinked?r.gdaTimes:[]):r.times;
   const isGDA=r.amexExclusive&&amexLinked;
@@ -329,7 +414,10 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
 
   const doSwipe=useCallback(dir=>{setFlyDir(dir);setTimeout(()=>onSwipe(dir,r),360);},[onSwipe,r]);
   useEffect(()=>{if(triggerSwipe&&isTop)doSwipe(triggerSwipe);},[triggerSwipe]);
-  useEffect(()=>{setDx(0);setFlyDir(null);},[stackIndex]);
+  useEffect(()=>{setDx(0);setFlyDir(null);setFlipped(false);setFlipping(false);},[stackIndex]);
+
+  const handleFlip=()=>{setFlipping(true);setTimeout(()=>{setFlipped(f=>!f);setFlipping(false);},150);};
+  const flipBack=()=>{setFlipping(true);setTimeout(()=>{setFlipped(false);setFlipping(false);},150);};
 
   useEffect(()=>{
     if(!isTop)return;
@@ -361,14 +449,17 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
 
   return(
     <div onMouseDown={onStart} onTouchStart={onStart}
-      onClick={()=>{if(isTop&&onTap&&Math.abs(ldx.current)<10&&!flyDir)onTap();}}
+      onClick={()=>{if(isTop&&Math.abs(ldx.current)<10&&!flyDir)handleFlip();}}
       style={{position:"absolute",inset:0,transform:tf,transition:tr,zIndex:30-stackIndex,
         cursor:isTop?(dragging.current?"grabbing":"grab"):"default",
         userSelect:"none",transformOrigin:"bottom center"}}>
       <div style={{borderRadius:18,overflow:"hidden",background:"#FFF",
         boxShadow:"0 6px 28px rgba(0,0,0,0.12),0 1px 6px rgba(0,0,0,0.05)",
-        height:"100%",display:"flex",flexDirection:"column"}}>
-
+        height:"100%",display:"flex",flexDirection:"column",
+        transform:flipping?"scaleX(0.03)":"scaleX(1)",transition:"transform 0.14s ease"}}>
+      {flipped
+        ?<CardBack r={r} amexLinked={amexLinked} onFlipBack={flipBack} onSwipeRight={()=>{flipBack();setTimeout(()=>doSwipe("right"),160);}}/>
+        :<>
         {/* Photo */}
         <div style={{flex:"0 0 68%",position:"relative",overflow:"hidden"}}>
           <RestaurantImg r={r}/>
@@ -442,6 +533,7 @@ function SwipeCard({r,stackIndex,onSwipe,triggerSwipe,onTime,amexLinked,groupVot
             </div>
           )}
         </div>
+        </>}
       </div>
     </div>
   );
@@ -1363,7 +1455,6 @@ function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
   const[matchTime,setMatchTime]=useState(null);
   const[showGroup,setShowGroup]=useState(false);
   const[showAmexPromo,setShowAmexPromo]=useState(false);
-  const[detailR,setDetailR]=useState(null);
   const[trigger,setTrigger]=useState(null);
   const[notifyR,setNotifyR]=useState(null);
 
@@ -1641,7 +1732,6 @@ function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
               onSwipe={onSwipe} triggerSwipe={i===0?trigger:null}
               onTime={i===0?t=>onTime(r,t):null} amexLinked={amexLinked}
               groupVotes={groupSession?groupVotes[r.id]||0:0} memberCount={memberCount}
-              onTap={i===0?()=>setDetailR(r):null}
             />
           ))}
         </div>
@@ -1691,10 +1781,6 @@ function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
       {showGroup&&<GroupOverlay onClose={()=>setShowGroup(false)} onSessionStart={handleSessionStart}/>}
       {showFilter&&<FilterSheet filters={filters} onApply={applyAndClose} onClose={()=>setShowFilter(false)}/>}
       {showAmexPromo&&<AmexPromoSheet onClose={()=>setShowAmexPromo(false)}/>}
-      {detailR&&<RestaurantDetailSheet r={detailR} amexLinked={amexLinked}
-        onClose={()=>setDetailR(null)}
-        onReserve={(r,t)=>{setDetailR(null);setMatch(r);setMatchTime(t);}}
-      />}
 
       {/* Join prompt — triggered by ?group=CODE in URL */}
       {joinPrompt&&(
