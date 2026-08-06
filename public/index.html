@@ -1052,6 +1052,7 @@ function GroupOverlay({onClose,onSessionStart}){
   const[userName,setUserName]=useState("");
   const myId=useRef(getUID()).current;
   const dbRef=useRef(null);
+  const sessionStarted=useRef(false);
   const isFirebase=!!window.resyDB;
 
   const displayName=userName.trim()||"Guest";
@@ -1073,7 +1074,7 @@ function GroupOverlay({onClose,onSessionStart}){
   };
 
   const startSwiping=()=>{
-    if(dbRef.current) dbRef.current.child("members").off();
+    sessionStarted.current=true;
     onSessionStart({code,myId,dbRef:dbRef.current,name:displayName});
     onClose();
   };
@@ -1087,7 +1088,7 @@ function GroupOverlay({onClose,onSessionStart}){
     onClose();
   };
 
-  useEffect(()=>()=>{if(dbRef.current)dbRef.current.child("members").off();},[]);
+  useEffect(()=>()=>{if(dbRef.current&&!sessionStarted.current)dbRef.current.child("members").off();},[]);
 
   const memberCount=Object.keys(members).length;
   const groupUrl=`${window.location.origin}${window.location.pathname}?group=${code}`;
