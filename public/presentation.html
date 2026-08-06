@@ -47,8 +47,8 @@ body:hover #hud{opacity:1;}
 :-moz-full-screen #hud{display:none;}
 
 /* Overlay */
-#resy-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.9s ease;}
-#resy-overlay.visible{opacity:1;pointer-events:all;}
+#resy-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+#resy-overlay.visible{pointer-events:all;}
 #resy-backdrop{
   position:absolute;inset:0;
   background:rgba(0,0,0,0);
@@ -303,7 +303,7 @@ function showOverlay() {
   document.getElementById('resy-overlay').classList.add('visible');
   overlayVisible = true;
 
-  // Phone fades in showing splash
+  // Blur establishes first (~1.1s), then phone fades in
   setTimeout(() => {
     document.getElementById('demo-row').classList.add('loaded');
     // After 2s of showing the splash, reveal the iframe
@@ -311,13 +311,13 @@ function showOverlay() {
       document.getElementById('phone-splash').classList.add('hidden');
       document.getElementById('phone-iframe').style.opacity = '1';
     }, 2000);
-  }, 1200);
+  }, 1400);
 }
 
 function hideOverlay() {
   document.getElementById('resy-overlay').classList.remove('visible');
+  document.getElementById('demo-row').classList.remove('loaded');
   overlayVisible = false;
-  setTimeout(() => document.getElementById('demo-row').classList.remove('loaded'), 500);
 }
 
 /* ── Fullscreen ── */
