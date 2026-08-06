@@ -42,6 +42,10 @@ body:hover #hud{opacity:1;}
 #fs-btn{background:rgba(255,255,255,0.1);border:none;color:rgba(255,255,255,0.6);font-size:14px;width:30px;height:30px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 #fs-btn:hover{background:rgba(255,255,255,0.2);color:#FFF;}
 
+:fullscreen #hud{display:none;}
+:-webkit-full-screen #hud{display:none;}
+:-moz-full-screen #hud{display:none;}
+
 /* Overlay */
 #resy-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.5s ease;}
 #resy-overlay.visible{opacity:1;pointer-events:all;}
@@ -328,7 +332,7 @@ document.addEventListener('keydown', e => {
     if (overlayVisible) hideOverlay();
     go(-1);
   }
-  if (e.key === 'Escape') { e.preventDefault(); if (overlayVisible) hideOverlay(); if (peekActive) hidePeek(); }
+  if (e.key === 'Escape') { if (overlayVisible) hideOverlay(); if (peekActive) hidePeek(); }
   if (e.key === 'f' || e.key === 'F') toggleFullscreen();
   if (e.key === 'd' || e.key === 'D') overlayVisible ? hideOverlay() : showOverlay();
 });
