@@ -2125,17 +2125,15 @@ function ReservationsScreen({onDiscover,dynamicBookings}){
 }
 
 /* ── PROFILE SCREEN ── */
-function ProfileScreen(){
+function ProfileScreen({dynamicBookings}){
   const storedName=localStorage.getItem('resy_name')||'';
   const displayName=storedName||'Guest';
   const initials=storedName.trim().split(/\s+/).map(w=>w[0]?.toUpperCase()||'').join('').slice(0,2)||'?';
+  const totalReservations=47+(dynamicBookings||[]).length;
   const rows=[
     {icon:I.bookmark,label:"Saved Restaurants",note:"8"},
     {icon:I.star,label:"Dining Preferences"},
     {icon:I.card,label:"Payment Methods"},
-    {icon:I.bell,label:"Notifications"},
-    {icon:I.help,label:"Help & Support"},
-    {icon:I.settings,label:"Account Settings"},
   ];
   return(
     <div style={{height:"100%",background:"#FFF",display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -2155,7 +2153,7 @@ function ProfileScreen(){
             </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:1,background:"#F0F0F0",borderRadius:12,overflow:"hidden"}}>
-            {[["47","Reservations"],["31","Restaurants"],["4","Cities"]].map(([n,l])=>(
+            {[[String(totalReservations),"Reservations"],["31","Restaurants"],["4","Cities"]].map(([n,l])=>(
               <div key={l} style={{background:"#F9F9F9",padding:"12px 6px",textAlign:"center"}}>
                 <p style={{fontSize:19,fontWeight:800,color:"#1A1A1A",margin:"0 0 2px"}}>{n}</p>
                 <p style={{fontSize:9,color:"#AAAAAA",margin:0,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.5px"}}>{l}</p>
@@ -2245,10 +2243,6 @@ function App(){
           borderRadius:isWide?"38px 38px 0 0":0}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontWeight:900,fontSize:24,letterSpacing:"-1.5px",color:"#FF4438"}}>resy</span>
-            <div style={{display:"flex",gap:4}}>
-              <button style={{background:"none",border:"none",cursor:"pointer",padding:6,borderRadius:8}}><Svg d={I.mapPin} size={19} stroke="#555" sw={1.75}/></button>
-              <button style={{background:"none",border:"none",cursor:"pointer",padding:6,borderRadius:8}}><Svg d={I.bell} size={19} stroke="#555" sw={1.75}/></button>
-            </div>
           </div>
         </div>
 
@@ -2257,7 +2251,7 @@ function App(){
           <div style={{display:tab==="discover"?"flex":"none",flexDirection:"column",height:"100%"}}><DiscoverScreen onBookingConfirmed={addBooking} goToReservations={goToReservations} onGroupSession={setActiveGroupCode}/></div>
           <div style={{display:tab==="restaurants"?"flex":"none",flexDirection:"column",height:"100%"}}><RestaurantsScreen/></div>
           <div style={{display:tab==="reservations"?"flex":"none",flexDirection:"column",height:"100%"}}><ReservationsScreen onDiscover={()=>setTab("discover")} dynamicBookings={bookings}/></div>
-          <div style={{display:tab==="profile"?"flex":"none",flexDirection:"column",height:"100%"}}><ProfileScreen/></div>
+          <div style={{display:tab==="profile"?"flex":"none",flexDirection:"column",height:"100%"}}><ProfileScreen dynamicBookings={bookings}/></div>
         </div>
 
         {/* Nav is a normal flex child — never clipped */}
