@@ -1500,8 +1500,9 @@ const AmexBar=({tier})=>(
 
 /* ── DISCOVER SCREEN ── */
 function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
-  const[showOnboard,setShowOnboard]=useState(true);
-  const[prefs,setPrefs]=useState(null);
+  const isGroupJoin=!!new URLSearchParams(window.location.search).get('group');
+  const[showOnboard,setShowOnboard]=useState(!isGroupJoin);
+  const[prefs,setPrefs]=useState(isGroupJoin?{amexTier:'none'}:null);
   const[filters,setFilters]=useState(DEFAULT_FILTERS);
   const[showFilter,setShowFilter]=useState(false);
   const[idx,setIdx]=useState(0);
