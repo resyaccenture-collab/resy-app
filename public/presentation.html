@@ -280,7 +280,11 @@ function hidePeek() {
 
 function go(dir) {
   if (dir === 1 && cur === PEEK_SLIDE && !peekActive) { showPeek(); return; }
-  if (peekActive) hidePeek();
+  if (peekActive) {
+    hidePeek();
+    setTimeout(() => goTo(cur + dir), 850);
+    return;
+  }
   goTo(cur + dir);
 }
 
