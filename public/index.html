@@ -172,6 +172,60 @@ const RESTAURANTS=[
     photo:"https://images.unsplash.com/photo-1551024709-8f23befc548e?auto=format&fit=crop&w=600&h=800&q=80",
     seed:"alchemist-geneva",past:false,upcoming:false
   },
+  {
+    id:11,name:"Copper Fox",cuisine:"American · Whiskey Bar",hood:"Downtown St. Charles",
+    price:"$$",pts:2,rating:4.3,dist:"1.4 mi",
+    desc:"Cozy gastropub centered on American comfort food elevated with scratch-kitchen care — wood-roasted half-chicken, bacon jam burgers — paired with an exceptional whiskey library.",
+    times:["5:00 PM","6:00 PM","7:30 PM","9:00 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["cozy","casual","lively","whiskey-focused"],dietary:[],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1592861956120-e524fc739696?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"copper-fox-stcharles",past:false,upcoming:false
+  },
+  {
+    id:12,name:"Niche",cuisine:"Modern American",hood:"Downtown Geneva",
+    price:"$$$",pts:3,rating:4.6,dist:"3.3 mi",
+    desc:"Chef-driven neighborhood bistro with a short, seasonal menu that changes weekly. Known for expertly sourced proteins and an intimate 38-seat dining room that books out fast.",
+    times:["6:00 PM","7:30 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["intimate","quiet","romantic","upscale"],dietary:["vegetarian-friendly"],good_for_groups:false,
+    photo:"https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"niche-geneva",past:false,upcoming:false
+  },
+  {
+    id:13,name:"Taqueria El Milagro",cuisine:"Mexican · Tacos",hood:"S. Elgin",
+    price:"$",pts:1,rating:4.7,dist:"4.1 mi",
+    desc:"Beloved family-run taqueria serving St. Charles since 2002. Fresh masa tortillas, slow-braised barbacoa, and hand-blended salsas — consistently voted best tacos in the Fox Valley.",
+    times:["11:30 AM","12:30 PM","5:00 PM","6:30 PM","8:00 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["casual","family-friendly","lively","outdoor"],dietary:["gluten-free-friendly","vegetarian-friendly"],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"taqueria-el-milagro",past:false,upcoming:false
+  },
+  {
+    id:14,name:"Sushi Kuchi",cuisine:"Japanese · Sushi",hood:"Downtown St. Charles",
+    price:"$$$",pts:3,rating:4.5,dist:"1.5 mi",
+    desc:"Omakase-style sushi bar and izakaya with chef's selection nigiri, inventive maki, and Japanese whisky pours. Minimalist design, maximal flavor.",
+    times:["5:30 PM","7:00 PM","8:30 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["intimate","upscale","quiet","date-night"],dietary:["gluten-free-friendly"],good_for_groups:false,
+    photo:"https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"sushi-kuchi-stcharles",past:false,upcoming:false
+  },
+  {
+    id:15,name:"The Wheelhouse",cuisine:"American · Rooftop Bar",hood:"Downtown St. Charles",
+    price:"$$",pts:2,rating:4.2,dist:"1.3 mi",
+    desc:"Riverfront rooftop with panoramic Fox River views, a rotating tap list of 20 local craft beers, and a menu of shareable American bites — best sunset spot in St. Charles.",
+    times:["4:00 PM","5:30 PM","7:00 PM","8:30 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["outdoor","lively","scenic","vibrant","all-day"],dietary:["vegetarian-friendly"],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"wheelhouse-stcharles",past:false,upcoming:false
+  },
+  {
+    id:16,name:"Brü Craft & Wurst",cuisine:"German · Beer Hall",hood:"Downtown St. Charles",
+    price:"$$",pts:2,rating:4.4,dist:"1.6 mi",
+    desc:"European-style beer hall pouring 48 rotating taps alongside housemade wursts, Bavarian pretzels, and schnitzel — long communal tables, loud fun, and German-inspired hospitality.",
+    times:["4:00 PM","5:00 PM","6:30 PM","8:00 PM"],notifyOnly:false,gdaTimes:[],amexExclusive:false,
+    ambiance:["lively","family-friendly","buzzy","casual","festive"],dietary:[],good_for_groups:true,
+    photo:"https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&h=800&q=80",
+    seed:"bru-craft-wurst",past:false,upcoming:false
+  },
 ];
 
 /* ── RESTAURANT COORDINATES (lat, lng) near Q Center, St. Charles IL ── */
@@ -186,6 +240,12 @@ const COORDS={
   8:[41.8471,-88.3124], // Portofino Trattoria
   9:[41.8872,-88.3031], // Mosaic Kitchen
   10:[41.8878,-88.3029],// The Alchemist
+  11:[41.9133,-88.3060],// Copper Fox
+  12:[41.8880,-88.3035],// Niche
+  13:[41.8782,-88.3197],// Taqueria El Milagro
+  14:[41.9140,-88.3071],// Sushi Kuchi
+  15:[41.9137,-88.3082],// The Wheelhouse
+  16:[41.9136,-88.3066],// Brü Craft & Wurst
 };
 const Q_CENTER=[41.9231,-88.3081];
 
@@ -1688,7 +1748,7 @@ function DiscoverScreen({onBookingConfirmed,goToReservations,onGroupSession}){
     if(groupSession){
       if(dir==="right"){
         // Show time picker; swipe recorded after user picks a time
-        const availTimes=(r.times.length>0?r.times:r.gdaTimes);
+        const availTimes=r.notifyOnly?(amexLinked?r.gdaTimes:[]):r.times;
         if(availTimes.length>0){setPendingTimeR(r);return;}
         recordGroupSwipe(r,null);
       } else {
